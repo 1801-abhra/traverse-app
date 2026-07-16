@@ -11,15 +11,21 @@ const rideRoutes = require('./routes/rides');
 const app = express();
 const server = http.createServer(app);
 
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://traverse-client.vercel.app',
+  process.env.CLIENT_URL
+].filter(Boolean);
+
 const io = socketio(server, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    origin: allowedOrigins,
     methods: ['GET', 'POST']
   }
 });
 
 // Middleware
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:3000' }));
+app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 
 // MongoDB Connection
