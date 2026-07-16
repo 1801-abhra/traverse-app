@@ -6,6 +6,15 @@ const router = express.Router();
 // Book a ride (student)
 router.post('/book', protect, async (req, res) => {
   try {
+    // Check if student already has active ride
+    const existingRide = await Ride.findOne({
+      student: req.user._id,
+      status: { $in: ['searching', 'accepted', 'ontheway'] }
+    });
+    if (existingRide) {
+      return res.status(400).json({ message: 'You already have an active ride' });
+    }
+
     const { pickup, dropoff } = req.body;
     const ride = await Ride.create({
       student: req.user._id,
@@ -41,25 +50,44 @@ router.put('/accept/:id', protect, async (req, res) => {
     if (ride.status !== 'searching') {
       return res.status(400).json({ message: 'Ride no longer available' });
     }
+    // Check if driver already has active ride
+    const driverActiveRide = await Ride.findOne({
+      driver: req.user._id,
+      status: { $in: ['accepted', 'ontheway'] }
+    });
+    if (driverActiveRide) {
+      return res.status(400).json({ message: 'You already have an active ride' });
+    }
     ride.driver = req.user._id;
     ride.status = 'accepted';
     await ride.save();
-    const populated = await ride.populate('driver', 'name vehicleNumber phone');
-    await populated.populate('student', 'name');
-
-    // Notify original student
+    const populated = await Ride.findById(ride._id)
+      .populate('driver', 'name vehicleNumber phone')
+      .populate('student', 'name')
+      .populate('sharedWith', 'name');
     req.io.to(ride.student.toString()).emit('ride:accepted', populated);
-
-    // Notify shared student if exists
     if (ride.sharedWith) {
       req.io.to(ride.sharedWith.toString()).emit('ride:accepted', populated);
     }
     res.json(populated);
   } catch (error) {
+    console.log('Accept error:', error.message);
     res.status(500).json({ message: error.message });
   }
 });
-
+// Reject a Ride
+router.put('/reject/:id', protect, async (req, res) => {
+  try {
+    const ride = await Ride.findById(req.params.id);
+    if (!ride) return res.status(404).json({ message: 'Ride not found' });
+    ride.status = 'searching';
+    ride.driver = null;
+    await ride.save();
+    res.json({ message: 'Ride rejected' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 // Update ride status (driver)
 router.put('/status/:id', protect, async (req, res) => {
   try {
@@ -173,6 +201,14 @@ router.put('/admin/cancel/:id', async (req, res) => {
 // Book shared ride
 router.post('/book-shared', protect, async (req, res) => {
   try {
+    // Check if student already has active ride
+    const activeRide = await Ride.findOne({
+      student: req.user._id,
+      status: { $in: ['searching', 'accepted', 'ontheway'] }
+    });
+    if (activeRide) {
+      return res.status(400).json({ message: 'You already have an active ride' });
+    }
     const { pickup, dropoff, fare } = req.body;
 
     // Look for existing unmatched shared ride going same route
