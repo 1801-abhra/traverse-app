@@ -45,8 +45,15 @@ router.put('/accept/:id', protect, async (req, res) => {
     ride.status = 'accepted';
     await ride.save();
     const populated = await ride.populate('driver', 'name vehicleNumber phone');
-    // Notify student
+    await populated.populate('student', 'name');
+
+    // Notify original student
     req.io.to(ride.student.toString()).emit('ride:accepted', populated);
+
+    // Notify shared student if exists
+    if (ride.sharedWith) {
+      req.io.to(ride.sharedWith.toString()).emit('ride:accepted', populated);
+    }
     res.json(populated);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -61,8 +68,12 @@ router.put('/status/:id', protect, async (req, res) => {
     if (!ride) return res.status(404).json({ message: 'Ride not found' });
     ride.status = status;
     await ride.save();
-    // Notify student
+    // Notify original student
     req.io.to(ride.student.toString()).emit('ride:updated', ride);
+    // Notify shared student if exists
+    if (ride.sharedWith) {
+      req.io.to(ride.sharedWith.toString()).emit('ride:updated', ride);
+    }
     res.json(ride);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -184,7 +195,11 @@ router.post('/book-shared', protect, async (req, res) => {
         message: `${req.user.name} joined your shared ride! Fare divided to ₹${existingRide.fare}`,
         ride: existingRide
       });
-
+      // Notify second student too
+      req.io.to(req.user._id.toString()).emit('ride:matched', {
+        message: `Matched with ${existingRide.student.name}! Fare: ₹${existingRide.fare}`,
+        ride: existingRide
+      });
       return res.status(200).json({
         matched: true,
         ride: existingRide,
