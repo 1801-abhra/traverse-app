@@ -14,6 +14,7 @@ const server = http.createServer(app);
 const allowedOrigins = [
   'http://localhost:3000',
   'https://traverse-client.vercel.app',
+  'https://traverse-unicab.vercel.app',
   process.env.CLIENT_URL
 ].filter(Boolean);
 
