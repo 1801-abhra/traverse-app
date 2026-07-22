@@ -39,7 +39,7 @@ const rideSchema = new mongoose.Schema({
   isScheduled: {
     type: Boolean,
     default: false
-  }
+  },
   sharedWith: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
