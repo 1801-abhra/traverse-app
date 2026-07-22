@@ -32,6 +32,14 @@ const rideSchema = new mongoose.Schema({
     enum: ['private', 'shared'],
     default: 'private'
   },
+  scheduledTime: {
+    type: Date,
+    default: null
+  },
+  isScheduled: {
+    type: Boolean,
+    default: false
+  }
   sharedWith: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
