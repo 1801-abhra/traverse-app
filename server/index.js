@@ -26,7 +26,12 @@ const io = socketio(server, {
 });
 
 // Middleware
-app.use(cors({ origin: allowedOrigins }));
+app.use(cors({
+  origin: function (origin, callback) {
+    callback(null, true);
+  },
+  credentials: true
+}));
 app.use(express.json());
 
 // MongoDB Connection
