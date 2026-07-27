@@ -18,6 +18,11 @@ const allowedOrigins = [
   process.env.CLIENT_URL
 ].filter(Boolean);
 
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
+
 const io = socketio(server, {
   cors: {
     origin: allowedOrigins,
