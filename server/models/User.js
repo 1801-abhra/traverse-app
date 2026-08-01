@@ -8,18 +8,20 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ['student', 'driver'], required: true },
   studentId: { type: String, default: '' },
   vehicleNumber: { type: String, default: '' },
+  phone: { type: String, default: '' },
   carName: { type: String, default: '' },
-carModel: { type: String, default: '' },
+  carModel: { type: String, default: '' },
+
   isAvailable: { type: Boolean, default: true }
 }, { timestamps: true });
 
-userSchema.pre('save', async function() {
+userSchema.pre('save', async function () {
   if (!this.isModified('password')) return;
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
 });
 
-userSchema.methods.matchPassword = async function(enteredPassword) {
+userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
