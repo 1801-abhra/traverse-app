@@ -66,8 +66,8 @@ router.put('/accept/:id', protect, async (req, res) => {
     ride.status = 'accepted';
     await ride.save();
     const populated = await Ride.findById(ride._id)
-      .populate('driver', 'name vehicleNumber phone')
-      .populate('student', 'name')
+      .populate('driver', 'name vehicleNumber phone carName carModel')
+      .populate('student', 'name email studentId phone')
       .populate('sharedWith', 'name');
     req.io.to(ride.student.toString()).emit('ride:accepted', populated);
     if (ride.sharedWith) {
