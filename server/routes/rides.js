@@ -15,15 +15,19 @@ router.post('/book', protect, async (req, res) => {
       return res.status(400).json({ message: 'You already have an active ride' });
     }
 
-    const { pickup, dropoff } = req.body;
+    const { pickup, dropoff, fare, scheduledTime } = req.body;
     const ride = await Ride.create({
       student: req.user._id,
       pickup,
       dropoff,
-      status: 'searching'
+      fare,
+      status: 'searching',
+      isScheduled: scheduledTime ? true : false,
+      scheduledTime: scheduledTime || null
     });
     // Notify all drivers
-    req.io.emit('new:ride', ride);
+    const populatedRide = await Ride.findById(ride._id);
+    req.io.emit('new:ride', populatedRide);
     res.status(201).json(ride);
   } catch (error) {
     res.status(500).json({ message: error.message });
