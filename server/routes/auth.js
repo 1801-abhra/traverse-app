@@ -20,10 +20,6 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'Drivers must register with a personal email' });
     }
 
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      return res.status(400).json({ message: 'User already exists' });
-    }
     const { name, email, password, role, studentId, vehicleNumber, phone, carName, carModel } = req.body;
     const userExists = await User.findOne({ email });
     if (userExists) {
