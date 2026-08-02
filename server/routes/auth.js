@@ -11,6 +11,19 @@ const generateToken = (id) => {
 // Register
 router.post('/register', async (req, res) => {
   try {
+    // Email validation
+    if (role === 'student' && !email.endsWith('@juitsolan.in')) {
+      return res.status(400).json({ message: 'Students must register with their JUIT email (@juitsolan.in)' });
+    }
+
+    if (role === 'driver' && email.endsWith('@juitsolan.in')) {
+      return res.status(400).json({ message: 'Drivers must register with a personal email' });
+    }
+
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ message: 'User already exists' });
+    }
     const { name, email, password, role, studentId, vehicleNumber, phone, carName, carModel } = req.body;
     const userExists = await User.findOne({ email });
     if (userExists) {
@@ -42,7 +55,9 @@ router.post('/login', async (req, res) => {
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
-
+    if (user.role === 'student' && !email.endsWith('@juitsolan.in')) {
+      return res.status(401).json({ message: 'Students must use their JUIT email' });
+    }
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid credentials' });
