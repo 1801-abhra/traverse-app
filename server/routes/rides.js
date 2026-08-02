@@ -255,7 +255,8 @@ router.post('/book-shared', protect, async (req, res) => {
       isMatched: false
     });
 
-    req.io.emit('new:ride', ride);
+    const populatedRide = await Ride.findById(ride._id);
+    req.io.emit('new:ride', populatedRide);
 
     res.status(201).json({
       matched: false,
