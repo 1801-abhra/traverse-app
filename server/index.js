@@ -31,7 +31,7 @@ const io = socketio(server, {
 });
 
 // Middleware
-aapp.use(cors({
+app.use(cors({
   origin: function (origin, callback) {
     callback(null, true);
   },
