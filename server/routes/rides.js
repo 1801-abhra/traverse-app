@@ -218,16 +218,16 @@ router.post('/book-shared', protect, async (req, res) => {
     if (activeRide) {
       return res.status(400).json({ message: 'You already have an active ride' });
     }
-    const { pickup, dropoff, fare } = req.body;
+    const { pickup, dropoff, fare, vehicleType } = req.body;
 
     // Look for existing unmatched shared ride going same route
     const existingRide = await Ride.findOne({
       rideType: 'shared',
       isMatched: false,
       status: 'searching',
+      vehicleType: vehicleType || '4+1',
       dropoff: { $regex: dropoff, $options: 'i' }
     }).populate('student', 'name');
-
     if (existingRide && existingRide.student._id.toString() !== req.user._id.toString()) {
       // Match found — join existing ride
       existingRide.isMatched = true;
@@ -261,6 +261,7 @@ router.post('/book-shared', protect, async (req, res) => {
       originalFare: fare,
       status: 'searching',
       rideType: 'shared',
+      vehicleType: vehicleType || '4+1',
       isMatched: false
     });
 
