@@ -32,6 +32,15 @@ const rideSchema = new mongoose.Schema({
     enum: ['private', 'shared'],
     default: 'private'
   },
+  vehicleType: {
+    type: String,
+    enum: ['4+1', '6+1'],
+    default: '4+1'
+  },
+  destination: {
+    type: String,
+    default: ''
+  },
   scheduledTime: {
     type: Date,
     default: null
