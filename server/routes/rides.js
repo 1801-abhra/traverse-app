@@ -210,7 +210,6 @@ router.put('/admin/cancel/:id', async (req, res) => {
 // Book shared ride
 router.post('/book-shared', protect, async (req, res) => {
   try {
-    // Check if student already has active ride
     const activeRide = await Ride.findOne({
       student: req.user._id,
       status: { $in: ['searching', 'accepted', 'ontheway'] }
@@ -218,56 +217,45 @@ router.post('/book-shared', protect, async (req, res) => {
     if (activeRide) {
       return res.status(400).json({ message: 'You already have an active ride' });
     }
+
     const { pickup, dropoff, fare, vehicleType } = req.body;
 
-    // Look for existing unmatched shared ride going same route
-    const existingRide = await Ride.findOne({
+    const ride = await Ride.create({
+      student: req.user._id,
+      pickup,
+      dropoff,
+      fare,
+      originalFare: fare,
+      status: 'searching',
+      rideType: 'shared',
+      vehicleType: vehicleType || '4+1',
+      isMatched: false
+    });
+
+    req.io.emit('new:ride', ride);
+
+    const availableMatches = await Ride.find({
       rideType: 'shared',
       isMatched: false,
       status: 'searching',
       vehicleType: vehicleType || '4+1',
-      dropoff: { $regex: dropoff, $options: 'i' }
+      student: { $ne: req.user._id }
     }).populate('student', 'name');
-    if (existingRide && existingRide.student._id.toString() !== req.user._id.toString()) {
-      // Don't auto-match, just create ride and return available matches
-      const availableMatches = await Ride.find({
-        rideType: 'shared',
-        isMatched: false,
-        status: 'searching',
-        vehicleType: vehicleType || '4+1',
-        student: { $ne: req.user._id }
-      }).populate('student', 'name studentId');
 
-      const ride = await Ride.create({
-        student: req.user._id,
-        pickup,
-        dropoff,
-        fare: fare,
-        originalFare: fare,
-        status: 'searching',
-        rideType: 'shared',
-        vehicleType: vehicleType || '4+1',
-        isMatched: false
-      });
+    return res.status(201).json({
+      matched: false,
+      ride,
+      availableMatches,
+      message: availableMatches.length > 0
+        ? `${availableMatches.length} person(s) going your way!`
+        : 'Looking for someone to share with...'
+    });
 
-      const populatedRide = await Ride.findById(ride._id);
-      req.io.emit('new:ride', populatedRide);
-
-      return res.status(201).json({
-        matched: false,
-        ride,
-        availableMatches,
-        message: availableMatches.length > 0
-          ? `${availableMatches.length} person(s) going your way! Choose to join or wait.`
-          : 'Looking for someone to share with...'
-      });
-
-    }
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.log('book-shared error:', error.message);
+    return res.status(500).json({ message: error.message });
   }
 });
-
 // Join existing shared ride
 router.put('/join-shared/:id', protect, async (req, res) => {
   try {
