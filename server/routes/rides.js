@@ -1,5 +1,6 @@
 const express = require('express');
 const Ride = require('../models/Ride');
+const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 const router = express.Router();
 
@@ -37,7 +38,11 @@ router.post('/book', protect, async (req, res) => {
 // Get available rides (driver)
 router.get('/available', protect, async (req, res) => {
   try {
-    const rides = await Ride.find({ status: 'searching' })
+    const driver = await User.findById(req.user._id);
+    const rides = await Ride.find({
+      status: 'searching',
+      vehicleType: driver.vehicleType
+    })
       .populate('student', 'name email studentId')
       .populate('sharedWith', 'name studentId');
     res.json(rides);
