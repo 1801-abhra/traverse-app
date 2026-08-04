@@ -229,51 +229,68 @@ router.post('/book-shared', protect, async (req, res) => {
       dropoff: { $regex: dropoff, $options: 'i' }
     }).populate('student', 'name');
     if (existingRide && existingRide.student._id.toString() !== req.user._id.toString()) {
-      // Match found — join existing ride
-      existingRide.isMatched = true;
-      existingRide.sharedWith = req.user._id;
-      existingRide.fare = Math.ceil(existingRide.originalFare / 2);
-      await existingRide.save();
+      // Don't auto-match, just create ride and return available matches
+      const availableMatches = await Ride.find({
+        rideType: 'shared',
+        isMatched: false,
+        status: 'searching',
+        vehicleType: vehicleType || '4+1',
+        dropoff: { $regex: dropoff, $options: 'i' },
+        student: { $ne: req.user._id }
+      }).populate('student', 'name studentId');
 
-      // Notify original student about match
-      req.io.to(existingRide.student._id.toString()).emit('ride:matched', {
-        message: `${req.user.name} joined your shared ride! Fare divided to ₹${existingRide.fare}`,
-        ride: existingRide
+      const ride = await Ride.create({
+        student: req.user._id,
+        pickup,
+        dropoff,
+        fare: fare,
+        originalFare: fare,
+        status: 'searching',
+        rideType: 'shared',
+        vehicleType: vehicleType || '4+1',
+        isMatched: false
       });
-      // Notify second student too
-      req.io.to(req.user._id.toString()).emit('ride:matched', {
-        message: `Matched with ${existingRide.student.name}! Fare: ₹${existingRide.fare}`,
-        ride: existingRide
+
+      const populatedRide = await Ride.findById(ride._id);
+      req.io.emit('new:ride', populatedRide);
+
+      return res.status(201).json({
+        matched: false,
+        ride,
+        availableMatches,
+        message: availableMatches.length > 0
+          ? `${availableMatches.length} person(s) going your way! Choose to join or wait.`
+          : 'Looking for someone to share with...'
       });
-      return res.status(200).json({
-        matched: true,
-        ride: existingRide,
-        message: `Matched with ${existingRide.student.name}! Fare: ₹${existingRide.fare}`
-      });
+
     }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 
-    // No match found — create new shared ride
-    const ride = await Ride.create({
-      student: req.user._id,
-      pickup,
-      dropoff,
-      fare: Math.ceil(fare / 2),
-      originalFare: fare,
-      status: 'searching',
-      rideType: 'shared',
-      vehicleType: vehicleType || '4+1',
-      isMatched: false
+// Join existing shared ride
+router.put('/join-shared/:id', protect, async (req, res) => {
+  try {
+    const ride = await Ride.findById(req.params.id).populate('student', 'name');
+    if (!ride) return res.status(404).json({ message: 'Ride not found' });
+    if (ride.isMatched) return res.status(400).json({ message: 'Ride already matched' });
+
+    ride.isMatched = true;
+    ride.sharedWith = req.user._id;
+    ride.fare = Math.ceil(ride.originalFare / 2);
+    await ride.save();
+
+    req.io.to(ride.student._id.toString()).emit('ride:matched', {
+      message: `${req.user.name} joined your shared ride! Fare divided to ₹${ride.fare}`,
+      ride
+    });
+    req.io.to(req.user._id.toString()).emit('ride:matched', {
+      message: `Matched with ${ride.student.name}! Fare: ₹${ride.fare}`,
+      ride
     });
 
-    const populatedRide = await Ride.findById(ride._id);
-    req.io.emit('new:ride', populatedRide);
-
-    res.status(201).json({
-      matched: false,
-      ride,
-      message: 'Looking for someone to share with...'
-    });
-
+    res.json({ matched: true, ride, message: `Matched with ${ride.student.name}! Fare: ₹${ride.fare}` });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
