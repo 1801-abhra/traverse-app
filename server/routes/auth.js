@@ -11,7 +11,7 @@ const generateToken = (id) => {
 // Register
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, role, studentId, vehicleNumber, phone, carName, carModel } = req.body;
+    const { name, email, password, role, studentId, vehicleNumber, phone, carName, carModel, vehicleType } = req.body;
 
     // Email validation
     if (role === 'student' && !email.endsWith('@juitsolan.in')) {
@@ -26,7 +26,7 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    const user = new User({ name, email, password, role, studentId, vehicleNumber, phone, carName, carModel });
+    const user = new User({ name, email, password, role, studentId, vehicleNumber, phone, carName, carModel, vehicleType });
     await user.save();
     return res.status(201).json({
       _id: user._id,

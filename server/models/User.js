@@ -11,6 +11,11 @@ const userSchema = new mongoose.Schema({
   phone: { type: String, default: '' },
   carName: { type: String, default: '' },
   carModel: { type: String, default: '' },
+  vehicleType: {
+    type: String,
+    enum: ['4+1', '6+1'],
+    default: '4+1'
+  },
 
   isAvailable: { type: Boolean, default: true }
 }, { timestamps: true });
