@@ -235,7 +235,6 @@ router.post('/book-shared', protect, async (req, res) => {
         isMatched: false,
         status: 'searching',
         vehicleType: vehicleType || '4+1',
-        dropoff: { $regex: dropoff, $options: 'i' },
         student: { $ne: req.user._id }
       }).populate('student', 'name studentId');
 
