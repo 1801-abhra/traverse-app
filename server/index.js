@@ -10,15 +10,20 @@ const authRoutes = require('./routes/auth');
 const rideRoutes = require('./routes/rides');
 
 // Initialize Firebase Admin
+// Initialize Firebase Admin
 try {
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY
+    .replace(/\\n/g, '\n')
+    .replace(/"/g, '');
+
   admin.initializeApp({
     credential: admin.credential.cert({
       projectId: process.env.FIREBASE_PROJECT_ID,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY ?
-        process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : ''
+      privateKey: privateKey
     })
   });
+  console.log('Firebase initialized successfully');
 } catch (error) {
   console.log('Firebase init error:', error.message);
 }
