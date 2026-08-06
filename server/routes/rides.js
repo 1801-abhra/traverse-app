@@ -356,4 +356,18 @@ router.get('/shared/available', protect, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+// Get active ride for student
+router.get('/active', protect, async (req, res) => {
+  try {
+    const ride = await Ride.findOne({
+      student: req.user._id,
+      status: { $in: ['searching', 'accepted', 'ontheway'] }
+    })
+      .populate('driver', 'name vehicleNumber phone carName carModel')
+      .populate('student', 'name');
+    res.json(ride || null);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 module.exports = router;
