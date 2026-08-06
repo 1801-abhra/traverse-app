@@ -174,6 +174,8 @@ router.put('/cancel/:id', protect, async (req, res) => {
     }
     ride.status = 'cancelled';
     await ride.save();
+    // Notify all drivers to remove this ride
+    req.io.emit('ride:cancelled', { rideId: ride._id.toString() });
     res.json(ride);
   } catch (error) {
     res.status(500).json({ message: error.message });
