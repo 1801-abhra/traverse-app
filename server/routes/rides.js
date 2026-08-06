@@ -4,22 +4,21 @@ const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 const router = express.Router();
 const sendPushNotification = async (admin, fcmToken, title, body) => {
-  if (!fcmToken) {
-    console.log('No FCM token available');
-    return;
-  }
+  if (!fcmToken) return;
   try {
-    console.log('Sending push to:', fcmToken.substring(0, 20) + '...');
     await admin.messaging().send({
       token: fcmToken,
-      notification: { title, body },
+      data: {
+        title,
+        body
+      },
       webpush: {
-        notification: {
+        headers: {
+          Urgency: 'high'
+        },
+        data: {
           title,
-          body,
-          icon: '/logo192.png',
-          badge: '/logo192.png',
-          vibrate: [200, 100, 200]
+          body
         }
       }
     });
