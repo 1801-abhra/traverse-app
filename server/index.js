@@ -6,56 +6,35 @@ const cors = require('cors');
 require('dotenv').config();
 const admin = require('firebase-admin');
 
+const authRoutes = require('./routes/auth');
+const rideRoutes = require('./routes/rides');
+
 // Initialize Firebase Admin
 try {
-  if (!admin.apps || !admin.apps.length) {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY ?
-          process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : ''
-      })
-    });
-  }
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY ?
+        process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : ''
+    })
+  });
 } catch (error) {
   console.log('Firebase init error:', error.message);
 }
 
-const authRoutes = require('./routes/auth');
-const rideRoutes = require('./routes/rides');
-
 const app = express();
 const server = http.createServer(app);
-
-// Make admin accessible in routes
-app.use((req, res, next) => {
-  req.admin = admin;
-  next();
-});
-const app = express();
-const server = http.createServer(app);
-
-const allowedOrigins = [
-  'http://localhost:3000',
-  'https://traverse-client.vercel.app',
-  'https://traverse-unicab.vercel.app',
-  process.env.CLIENT_URL
-].filter(Boolean);
-
-app.use(cors({
-  origin: allowedOrigins,
-  credentials: true
-}));
 
 const io = socketio(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: function (origin, callback) {
+      callback(null, true);
+    },
     methods: ['GET', 'POST']
   }
 });
 
-// Middleware
 app.use(cors({
   origin: function (origin, callback) {
     callback(null, true);
@@ -76,6 +55,7 @@ app.use((req, res, next) => {
   }
   next();
 });
+
 // MongoDB Connection
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('MongoDB connected'))
@@ -96,16 +76,16 @@ io.on('connection', (socket) => {
       io.to(sharedWithId).emit('driver:location', { lat, lng });
     }
   });
+
   socket.on('disconnect', () => {
     console.log('Socket disconnected:', socket.id);
   });
-
-
 });
 
-// Make io accessible in routes
+// Make io and admin accessible in routes
 app.use((req, res, next) => {
   req.io = io;
+  req.admin = admin;
   next();
 });
 
@@ -115,6 +95,5 @@ app.use('/api/rides', rideRoutes);
 
 app.get('/', (req, res) => res.send('Traverse API running'));
 
-// Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
