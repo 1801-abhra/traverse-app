@@ -33,10 +33,6 @@ app.use((req, res, next) => {
   req.admin = admin;
   next();
 });
-
-const authRoutes = require('./routes/auth');
-const rideRoutes = require('./routes/rides');
-
 const app = express();
 const server = http.createServer(app);
 
