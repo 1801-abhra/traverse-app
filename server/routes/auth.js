@@ -113,3 +113,13 @@ router.post('/admin/login', async (req, res) => {
   }
 });
 module.exports = router;
+// Save FCM token
+router.post('/save-token', protect, async (req, res) => {
+  try {
+    const { fcmToken } = req.body;
+    await User.findByIdAndUpdate(req.user._id, { fcmToken });
+    res.json({ message: 'Token saved' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});

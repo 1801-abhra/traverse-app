@@ -3,6 +3,26 @@ const Ride = require('../models/Ride');
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 const router = express.Router();
+const sendPushNotification = async (admin, fcmToken, title, body) => {
+  if (!fcmToken) return;
+  try {
+    await admin.messaging().send({
+      token: fcmToken,
+      notification: { title, body },
+      webpush: {
+        notification: {
+          title,
+          body,
+          icon: '/logo192.png',
+          badge: '/logo192.png',
+          vibrate: [200, 100, 200]
+        }
+      }
+    });
+  } catch (error) {
+    console.log('Push notification error:', error.message);
+  }
+};
 
 // Book a ride (student)
 router.post('/book', protect, async (req, res) => {
@@ -79,6 +99,16 @@ router.put('/accept/:id', protect, async (req, res) => {
       req.io.to(ride.sharedWith.toString()).emit('ride:accepted', populated);
     }
     res.json(populated);
+    // Send push to student
+    const student = await User.findById(ride.student);
+    if (student?.fcmToken) {
+      await sendPushNotification(
+        req.admin,
+        student.fcmToken,
+        '🚗 Driver Accepted!',
+        `${req.user.name} is on the way. Vehicle: ${req.user.vehicleNumber}`
+      );
+    }
   } catch (error) {
     console.log('Accept error:', error.message);
     res.status(500).json({ message: error.message });
@@ -112,6 +142,23 @@ router.put('/status/:id', protect, async (req, res) => {
       req.io.to(ride.sharedWith.toString()).emit('ride:updated', ride);
     }
     res.json(ride);
+    const student = await User.findById(ride.student);
+    if (ride.status === 'ontheway' && student?.fcmToken) {
+      await sendPushNotification(
+        req.admin,
+        student.fcmToken,
+        '🚖 Driver On The Way!',
+        'Your driver is heading to your pickup location'
+      );
+    }
+    if (ride.status === 'completed' && student?.fcmToken) {
+      await sendPushNotification(
+        req.admin,
+        student.fcmToken,
+        '✅ Ride Completed!',
+        'Hope you had a great ride! Please rate your experience.'
+      );
+    }
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -233,6 +280,16 @@ router.post('/book-shared', protect, async (req, res) => {
     });
 
     req.io.emit('new:ride', ride);
+    // Notify available drivers
+    const drivers = await User.find({ role: 'driver', fcmToken: { $ne: null } });
+    for (const driver of drivers) {
+      await sendPushNotification(
+        req.admin,
+        driver.fcmToken,
+        '🔔 New Ride Request!',
+        `Pickup: ${pickup} → Drop: ${dropoff}`
+      );
+    }
 
     const availableMatches = await Ride.find({
       rideType: 'shared',

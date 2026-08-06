@@ -16,6 +16,10 @@ const userSchema = new mongoose.Schema({
     enum: ['4+1', '6+1'],
     default: '4+1'
   },
+  fcmToken: {
+    type: String,
+    default: null
+  },
 
   isAvailable: { type: Boolean, default: true }
 }, { timestamps: true });
