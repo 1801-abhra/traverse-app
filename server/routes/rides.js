@@ -4,8 +4,12 @@ const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 const router = express.Router();
 const sendPushNotification = async (admin, fcmToken, title, body) => {
-  if (!fcmToken) return;
+  if (!fcmToken) {
+    console.log('No FCM token available');
+    return;
+  }
   try {
+    console.log('Sending push to:', fcmToken.substring(0, 20) + '...');
     await admin.messaging().send({
       token: fcmToken,
       notification: { title, body },
@@ -19,11 +23,11 @@ const sendPushNotification = async (admin, fcmToken, title, body) => {
         }
       }
     });
+    console.log('Push sent successfully!');
   } catch (error) {
     console.log('Push notification error:', error.message);
   }
 };
-
 // Book a ride (student)
 router.post('/book', protect, async (req, res) => {
   try {
