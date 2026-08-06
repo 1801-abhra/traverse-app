@@ -30,7 +30,6 @@ const sendPushNotification = async (admin, fcmToken, title, body) => {
 // Book a ride (student)
 router.post('/book', protect, async (req, res) => {
   try {
-    // Check if student already has active ride
     const existingRide = await Ride.findOne({
       student: req.user._id,
       status: { $in: ['searching', 'accepted', 'ontheway'] }
@@ -39,26 +38,42 @@ router.post('/book', protect, async (req, res) => {
       return res.status(400).json({ message: 'You already have an active ride' });
     }
 
-    const { pickup, dropoff, fare, scheduledTime } = req.body;
+    const { pickup, dropoff, fare, scheduledTime, vehicleType } = req.body;
     const ride = await Ride.create({
       student: req.user._id,
       pickup,
       dropoff,
       fare,
       status: 'searching',
+      vehicleType: vehicleType || '4+1',
       isScheduled: scheduledTime ? true : false,
       scheduledTime: scheduledTime || null
     });
-    // Notify all drivers
+
     const populatedRide = await Ride.findById(ride._id)
       .populate('student', 'name email studentId');
     req.io.emit('new:ride', populatedRide);
+
+    // Notify drivers with matching vehicle type
+    const drivers = await User.find({
+      role: 'driver',
+      vehicleType: vehicleType || '4+1',
+      fcmToken: { $ne: null }
+    });
+    for (const driver of drivers) {
+      await sendPushNotification(
+        req.admin,
+        driver.fcmToken,
+        '🔔 New Ride Request!',
+        `${pickup} → ${dropoff}`
+      );
+    }
+
     res.status(201).json(ride);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
-
 // Get available rides (driver)
 router.get('/available', protect, async (req, res) => {
   try {
