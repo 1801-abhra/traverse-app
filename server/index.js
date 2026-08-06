@@ -21,6 +21,13 @@ try {
 } catch (error) {
   console.log('Firebase init error:', error.message);
 }
+
+const authRoutes = require('./routes/auth');
+const rideRoutes = require('./routes/rides');
+
+const app = express();
+const server = http.createServer(app);
+
 // Make admin accessible in routes
 app.use((req, res, next) => {
   req.admin = admin;
