@@ -47,7 +47,8 @@ router.post('/book', protect, async (req, res) => {
       scheduledTime: scheduledTime || null
     });
     // Notify all drivers
-    const populatedRide = await Ride.findById(ride._id);
+    const populatedRide = await Ride.findById(ride._id)
+      .populate('student', 'name email studentId');
     req.io.emit('new:ride', populatedRide);
     res.status(201).json(ride);
   } catch (error) {
