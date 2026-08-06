@@ -362,7 +362,7 @@ router.get('/active', protect, async (req, res) => {
   try {
     const ride = await Ride.findOne({
       student: req.user._id,
-      status: { $in: ['searching', 'accepted', 'ontheway'] }
+      status: { $in: ['searching', 'accepted', 'ontheway', 'completed'] }
     })
       .populate('driver', 'name vehicleNumber phone carName carModel')
       .populate('student', 'name');
