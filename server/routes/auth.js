@@ -117,6 +117,7 @@ module.exports = router;
 router.post('/save-token', protect, async (req, res) => {
   try {
     const { fcmToken } = req.body;
+    console.log('Saving FCM token for user:', req.user._id, 'token:', fcmToken ? 'exists' : 'null');
     await User.findByIdAndUpdate(req.user._id, { fcmToken });
     res.json({ message: 'Token saved' });
   } catch (error) {
