@@ -50,6 +50,12 @@ router.post('/login', async (req, res) => {
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
+    // Check if user is blocked
+    if (user.isBlocked) {
+      return res.status(403).json({
+        message: 'Your account has been blocked by admin. Please email traverseuni@gmail.com to resolve.'
+      });
+    }
     if (user.role === 'student' && !email.endsWith('@juitsolan.in')) {
       return res.status(401).json({ message: 'Students must use their JUIT email' });
     }
