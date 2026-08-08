@@ -440,15 +440,17 @@ router.put('/cancel-accepted/:id', protect, async (req, res) => {
   try {
     const ride = await Ride.findById(req.params.id);
     if (!ride) return res.status(404).json({ message: 'Ride not found' });
-    console.log('Ride status:', ride.status, 'User:', req.user._id);
     if (ride.status !== 'accepted') {
-      return res.status(400).json({ message: `Cannot cancel - ride status is: ${ride.status}` });
+      return res.status(400).json({ message: 'Can only cancel accepted rides' });
     }
+
+    const driverId = ride.driver;
+    const studentId = ride.student;
+
     // Increment cancel count
     await User.findByIdAndUpdate(req.user._id, { $inc: { cancelCount: 1 } });
-
-    // Check if user should be blacklisted
     const user = await User.findById(req.user._id);
+
     if (user.cancelCount >= 5) {
       await User.findByIdAndUpdate(req.user._id, { isBlocked: true });
       return res.status(403).json({
@@ -456,24 +458,38 @@ router.put('/cancel-accepted/:id', protect, async (req, res) => {
       });
     }
 
-    // Reset ride to searching
-    ride.status = 'searching';
+    // Cancel the ride completely
+    ride.status = 'cancelled';
     ride.driver = null;
     await ride.save();
 
-    // Notify both parties
-    req.io.to(ride.student.toString()).emit('ride:updated', ride);
-    if (ride.driver) {
-      req.io.to(ride.driver.toString()).emit('ride:updated', ride);
+    // Notify student - ride is cancelled
+    req.io.to(studentId.toString()).emit('ride:cancelled-by-party', {
+      message: 'Ride cancelled successfully.'
+    });
+
+    // Notify driver - ride was cancelled by student
+    if (driverId) {
+      req.io.to(driverId.toString()).emit('ride:cancelled-by-party', {
+        message: 'Student cancelled the ride.'
+      });
     }
 
-    // Send ride back to all drivers
-    const populatedRide = await Ride.findById(ride._id)
-      .populate('student', 'name email studentId');
-    req.io.emit('new:ride', populatedRide);
+    // Send push to driver
+    if (driverId) {
+      const driver = await User.findById(driverId);
+      if (driver?.fcmToken) {
+        await sendPushNotification(
+          req.admin,
+          driver.fcmToken,
+          '❌ Ride Cancelled',
+          'The student has cancelled the ride.'
+        );
+      }
+    }
 
     res.json({
-      ride,
+      message: 'Ride cancelled',
       cancelCount: user.cancelCount,
       warning: user.cancelCount >= 3 ? `Warning: ${5 - user.cancelCount} cancellations left before blacklist` : null
     });
