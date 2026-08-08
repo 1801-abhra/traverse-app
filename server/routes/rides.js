@@ -329,13 +329,18 @@ router.post('/book-shared', protect, async (req, res) => {
 
     req.io.emit('new:ride', ride);
     // Notify available drivers
-    const drivers = await User.find({ role: 'driver', fcmToken: { $ne: null } });
+    const drivers = await User.find({
+      role: 'driver',
+      vehicleType: vehicleType || '4+1',
+      isAvailable: true,
+      fcmToken: { $ne: null }
+    });
     for (const driver of drivers) {
       await sendPushNotification(
         req.admin,
         driver.fcmToken,
         '🔔 New Ride Request!',
-        `Pickup: ${pickup} → Drop: ${dropoff}`
+        `${pickup} → ${dropoff}`
       );
     }
 
