@@ -90,6 +90,33 @@ router.get('/available', protect, async (req, res) => {
   }
 });
 
+// Toggle driver availability
+router.put('/toggle-availability', protect, async (req, res) => {
+  try {
+    const driver = await User.findById(req.user._id);
+    driver.isAvailable = !driver.isAvailable;
+    await driver.save();
+    res.json({ isAvailable: driver.isAvailable });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Check driver availability for students
+router.get('/drivers-available', protect, async (req, res) => {
+  try {
+    const { vehicleType } = req.query;
+    const availableDrivers = await User.find({
+      role: 'driver',
+      isAvailable: true,
+      vehicleType: vehicleType || '4+1'
+    });
+    res.json({ available: availableDrivers.length > 0, count: availableDrivers.length });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // Accept ride (driver)
 router.put('/accept/:id', protect, async (req, res) => {
   try {
