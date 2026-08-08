@@ -331,7 +331,7 @@ router.post('/book-shared', protect, async (req, res) => {
 
   } catch (error) {
     console.log('book-shared error:', error.message);
-    return res.status(500).json({ message: error.message });
+    ~res.status(500).json({ message: error.message });
   }
 });
 // Join existing shared ride
@@ -378,12 +378,26 @@ router.get('/shared/available', protect, async (req, res) => {
 // Get active ride for student
 router.get('/active', protect, async (req, res) => {
   try {
-    const ride = await Ride.findOne({
+    // First check for active rides
+    let ride = await Ride.findOne({
       student: req.user._id,
       status: { $in: ['searching', 'accepted', 'ontheway'] }
     })
       .populate('driver', 'name vehicleNumber phone carName carModel')
       .populate('student', 'name');
+
+    // If no active ride check for recently completed (last 30 mins)
+    if (!ride) {
+      const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
+      ride = await Ride.findOne({
+        student: req.user._id,
+        status: 'completed',
+        updatedAt: { $gte: thirtyMinsAgo }
+      })
+        .populate('driver', 'name vehicleNumber phone carName carModel')
+        .populate('student', 'name');
+    }
+
     res.json(ride || null);
   } catch (error) {
     res.status(500).json({ message: error.message });
