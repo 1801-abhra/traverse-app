@@ -435,4 +435,50 @@ router.get('/active', protect, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+// Cancel accepted ride (both student and driver)
+router.put('/cancel-accepted/:id', protect, async (req, res) => {
+  try {
+    const ride = await Ride.findById(req.params.id);
+    if (!ride) return res.status(404).json({ message: 'Ride not found' });
+    if (ride.status !== 'accepted') {
+      return res.status(400).json({ message: 'Can only cancel accepted rides' });
+    }
+
+    // Increment cancel count
+    await User.findByIdAndUpdate(req.user._id, { $inc: { cancelCount: 1 } });
+
+    // Check if user should be blacklisted
+    const user = await User.findById(req.user._id);
+    if (user.cancelCount >= 5) {
+      await User.findByIdAndUpdate(req.user._id, { isBlocked: true });
+      return res.status(403).json({
+        message: 'You have been blacklisted due to repeated cancellations. Email traverseuni@gmail.com to appeal.'
+      });
+    }
+
+    // Reset ride to searching
+    ride.status = 'searching';
+    ride.driver = null;
+    await ride.save();
+
+    // Notify both parties
+    req.io.to(ride.student.toString()).emit('ride:updated', ride);
+    if (ride.driver) {
+      req.io.to(ride.driver.toString()).emit('ride:updated', ride);
+    }
+
+    // Send ride back to all drivers
+    const populatedRide = await Ride.findById(ride._id)
+      .populate('student', 'name email studentId');
+    req.io.emit('new:ride', populatedRide);
+
+    res.json({
+      ride,
+      cancelCount: user.cancelCount,
+      warning: user.cancelCount >= 3 ? `Warning: ${5 - user.cancelCount} cancellations left before blacklist` : null
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 module.exports = router;

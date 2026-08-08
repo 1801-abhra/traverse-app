@@ -21,7 +21,15 @@ const userSchema = new mongoose.Schema({
     default: null
   },
 
-  isAvailable: { type: Boolean, default: true }
+  isAvailable: { type: Boolean, default: true },
+  cancelCount: {
+    type: Number,
+    default: 0
+  },
+  isBlocked: {
+    type: Boolean,
+    default: false
+  }
 }, { timestamps: true });
 
 userSchema.pre('save', async function () {
