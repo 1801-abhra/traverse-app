@@ -440,10 +440,10 @@ router.put('/cancel-accepted/:id', protect, async (req, res) => {
   try {
     const ride = await Ride.findById(req.params.id);
     if (!ride) return res.status(404).json({ message: 'Ride not found' });
+    console.log('Ride status:', ride.status, 'User:', req.user._id);
     if (ride.status !== 'accepted') {
-      return res.status(400).json({ message: 'Can only cancel accepted rides' });
+      return res.status(400).json({ message: `Cannot cancel - ride status is: ${ride.status}` });
     }
-
     // Increment cancel count
     await User.findByIdAndUpdate(req.user._id, { $inc: { cancelCount: 1 } });
 
