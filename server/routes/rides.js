@@ -80,7 +80,8 @@ router.get('/available', protect, async (req, res) => {
     const driver = await User.findById(req.user._id);
     const rides = await Ride.find({
       status: 'searching',
-      vehicleType: driver.vehicleType
+      vehicleType: driver.vehicleType,
+      isScheduled: { $ne: true }
     })
       .populate('student', 'name email studentId')
       .populate('sharedWith', 'name studentId');
@@ -89,7 +90,6 @@ router.get('/available', protect, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-
 // Toggle driver availability
 router.put('/toggle-availability', protect, async (req, res) => {
   try {
