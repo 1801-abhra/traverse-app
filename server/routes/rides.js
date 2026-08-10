@@ -313,7 +313,7 @@ router.post('/book-shared', protect, async (req, res) => {
       return res.status(400).json({ message: 'You already have an active ride' });
     }
 
-    const { pickup, dropoff, fare, vehicleType } = req.body;
+    const { pickup, dropoff, fare, vehicleType, scheduledTime } = req.body;
 
     const ride = await Ride.create({
       student: req.user._id,
@@ -324,9 +324,10 @@ router.post('/book-shared', protect, async (req, res) => {
       status: 'searching',
       rideType: 'shared',
       vehicleType: vehicleType || '4+1',
-      isMatched: false
+      isMatched: false,
+      isScheduled: scheduledTime ? true : false,
+      scheduledTime: scheduledTime || null
     });
-
     req.io.emit('new:ride', ride);
     // Notify available drivers
     const drivers = await User.find({
