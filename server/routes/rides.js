@@ -510,4 +510,75 @@ router.put('/cancel-accepted/:id', protect, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+// Pre-accept scheduled ride (driver)
+router.put('/pre-accept/:id', protect, async (req, res) => {
+  try {
+    const ride = await Ride.findById(req.params.id);
+    if (!ride) return res.status(404).json({ message: 'Ride not found' });
+    if (!ride.isScheduled) return res.status(400).json({ message: 'Not a scheduled ride' });
+    if (ride.driver) return res.status(400).json({ message: 'Ride already pre-accepted by another driver' });
+
+    ride.driver = req.user._id;
+    await ride.save();
+
+    const populated = await Ride.findById(ride._id)
+      .populate('driver', 'name vehicleNumber phone')
+      .populate('student', 'name phone studentId');
+
+    // Notify student
+    req.io.to(ride.student.toString()).emit('ride:pre-accepted', {
+      message: `Driver ${req.user.name} will pick you up at scheduled time!`,
+      ride: populated
+    });
+
+    // Send push to student
+    const student = await User.findById(ride.student);
+    if (student?.fcmToken) {
+      await sendPushNotification(
+        req.admin,
+        student.fcmToken,
+        '✅ Scheduled Ride Confirmed!',
+        `${req.user.name} will pick you up at the scheduled time`
+      );
+    }
+
+    res.json(populated);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get scheduled rides for driver
+router.get('/scheduled', protect, async (req, res) => {
+  try {
+    const driver = await User.findById(req.user._id);
+    const rides = await Ride.find({
+      isScheduled: true,
+      status: 'searching',
+      vehicleType: driver.vehicleType,
+      scheduledTime: { $gte: new Date() }
+    })
+      .populate('student', 'name phone studentId')
+      .sort({ scheduledTime: 1 });
+    res.json(rides);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get driver's pre-accepted scheduled rides
+router.get('/my-scheduled', protect, async (req, res) => {
+  try {
+    const rides = await Ride.find({
+      driver: req.user._id,
+      isScheduled: true,
+      status: 'searching'
+    })
+      .populate('student', 'name phone studentId')
+      .sort({ scheduledTime: 1 });
+    res.json(rides);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 module.exports = router;
