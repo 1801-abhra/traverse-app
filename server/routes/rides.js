@@ -410,26 +410,12 @@ router.get('/shared/available', protect, async (req, res) => {
 // Get active ride for student
 router.get('/active', protect, async (req, res) => {
   try {
-    // First check for active rides
-    let ride = await Ride.findOne({
+    const ride = await Ride.findOne({
       student: req.user._id,
       status: { $in: ['searching', 'accepted', 'ontheway'] }
     })
       .populate('driver', 'name vehicleNumber phone carName carModel')
-      .populate('student', 'name');
-
-    // If no active ride check for recently completed (last 30 mins)
-    if (!ride) {
-      const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
-      ride = await Ride.findOne({
-        student: req.user._id,
-        status: 'completed',
-        updatedAt: { $gte: thirtyMinsAgo }
-      })
-        .populate('driver', 'name vehicleNumber phone carName carModel')
-        .populate('student', 'name');
-    }
-
+      .populate('student', 'name email studentId phone');
     res.json(ride || null);
   } catch (error) {
     res.status(500).json({ message: error.message });
