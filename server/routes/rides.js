@@ -102,6 +102,21 @@ router.put('/toggle-availability', protect, async (req, res) => {
   }
 });
 
+// Get active ride for driver
+router.get('/driver-active', protect, async (req, res) => {
+  try {
+    const ride = await Ride.findOne({
+      driver: req.user._id,
+      status: { $in: ['accepted', 'ontheway'] }
+    })
+      .populate('student', 'name email studentId phone')
+      .populate('driver', 'name vehicleNumber phone');
+    res.json(ride || null);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // Check driver availability for students
 router.get('/drivers-available', protect, async (req, res) => {
   try {
