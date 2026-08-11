@@ -105,6 +105,7 @@ router.put('/toggle-availability', protect, async (req, res) => {
 // Get active ride for driver
 router.get('/driver-active', protect, async (req, res) => {
   try {
+    res.set('Cache-Control', 'no-store');
     const ride = await Ride.findOne({
       driver: req.user._id,
       status: { $in: ['accepted', 'ontheway'] }
