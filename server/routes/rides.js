@@ -481,11 +481,10 @@ router.put('/cancel-accepted/:id', protect, async (req, res) => {
     const user = await User.findById(req.user._id);
 
     if (user.cancelCount >= 5) {
-      await User.findByIdAndUpdate(req.user._id, { isBlocked: true });
-      return res.status(403).json({
-        message: 'You have been blacklisted due to repeated cancellations. Email traverseuni@gmail.com to appeal.'
-      });
+      // Admin will block manually from admin panel
+      console.log(`User ${req.user._id} has reached 5 cancellations - admin review needed`);
     }
+
 
     // Cancel the ride completely
     ride.status = 'cancelled';
