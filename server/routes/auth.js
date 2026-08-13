@@ -3,6 +3,8 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const router = express.Router();
 const { protect } = require('../middleware/auth');
+const crypto = require('crypto');
+const { sendVerificationEmail } = require('../utils/email');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -29,14 +31,24 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    const user = new User({ name, email, password, role, studentId, vehicleNumber, phone, carName, carModel, vehicleType });
+    // Generate verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    const user = new User({
+      name, email, password, role, studentId, vehicleNumber,
+      phone, carName, carModel, vehicleType,
+      verificationToken,
+      verificationExpiry,
+      isVerified: false
+    });
     await user.save();
+
+    // Send verification email
+    await sendVerificationEmail(email, name, verificationToken);
+
     return res.status(201).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      token: generateToken(user._id)
+      message: 'Registration successful! Please check your email to verify your account.'
     });
   } catch (error) {
     console.log('Register error:', error.message);
@@ -57,6 +69,12 @@ router.post('/login', async (req, res) => {
     if (user.isBlocked) {
       return res.status(403).json({
         message: 'Your account has been blocked by admin. Please email traverseuni@gmail.com to resolve.'
+      });
+    }
+    // Check if email is verified
+    if (!user.isVerified) {
+      return res.status(401).json({
+        message: 'Please verify your email first. Check your inbox for the verification link.'
       });
     }
     if (user.role === 'student' && !email.endsWith('@juitsolan.in')) {
@@ -127,6 +145,48 @@ router.get('/me', protect, async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select('-password');
     res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Verify email
+router.get('/verify-email/:token', async (req, res) => {
+  try {
+    const user = await User.findOne({
+      verificationToken: req.params.token,
+      verificationExpiry: { $gt: new Date() }
+    });
+
+    if (!user) {
+      return res.status(400).send(`
+        <html>
+          <body style="font-family: Arial; background: #0a0a0a; color: white; text-align: center; padding: 60px;">
+            <h1 style="color: #e63946;">❌ Invalid or Expired Link</h1>
+            <p style="color: #999;">This verification link has expired. Please register again.</p>
+            <a href="https://traverse-unicab.vercel.app/register" style="color: #e63946;">Go to Register</a>
+          </body>
+        </html>
+      `);
+    }
+
+    user.isVerified = true;
+    user.verificationToken = null;
+    user.verificationExpiry = null;
+    await user.save();
+
+    return res.send(`
+      <html>
+        <body style="font-family: Arial; background: #0a0a0a; color: white; text-align: center; padding: 60px;">
+          <h1 style="color: #10b981;">✅ Email Verified!</h1>
+          <p style="color: #999;">Your Traverse-Unicab account is now active.</p>
+          <a href="https://traverse-unicab.vercel.app/login" 
+             style="background: #e63946; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+            Login Now
+          </a>
+        </body>
+      </html>
+    `);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
