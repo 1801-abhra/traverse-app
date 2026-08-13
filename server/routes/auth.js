@@ -192,6 +192,26 @@ router.get('/verify-email/:token', async (req, res) => {
   }
 });
 
+router.post('/resend-verification', async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (user.isVerified) return res.status(400).json({ message: 'Already verified' });
+
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    user.verificationToken = verificationToken;
+    user.verificationExpiry = verificationExpiry;
+    await user.save();
+
+    await sendVerificationEmail(email, user.name, verificationToken);
+    res.json({ message: 'Verification email sent!' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 module.exports = router;
 // Save FCM token
 router.post('/save-token', protect, async (req, res) => {
