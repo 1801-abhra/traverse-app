@@ -1,24 +1,13 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    },
-    tls: {
-        rejectUnauthorized: false
-    }
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const sendVerificationEmail = async (email, name, token) => {
     const verifyUrl = `https://traverse-app.onrender.com/api/auth/verify-email/${token}`;
 
     try {
-        const info = await transporter.sendMail({
-            from: `"Traverse-Unicab" <${process.env.EMAIL_USER}>`,
+        const { data, error } = await resend.emails.send({
+            from: 'Traverse-Unicab <onboarding@resend.dev>',
             to: email,
             subject: '✅ Verify your Traverse-Unicab account',
             html: `
@@ -47,9 +36,13 @@ const sendVerificationEmail = async (email, name, token) => {
         </div>
       `
         });
-        console.log('Email sent successfully:', info.messageId);
-    } catch (error) {
-        console.log('Email send error:', error.message);
+        if (error) {
+            console.log('Resend error:', error);
+        } else {
+            console.log('Email sent:', data.id);
+        }
+    } catch (err) {
+        console.log('Email error:', err.message);
     }
 };
 
