@@ -17,6 +17,9 @@ router.post('/register', async (req, res) => {
     if (role === 'student' && !email.endsWith('@juitsolan.in')) {
       return res.status(400).json({ message: 'Students must register with their JUIT email (@juitsolan.in)' });
     }
+    if (role === 'faculty' && !email.endsWith('@juitsolan.in')) {
+      return res.status(400).json({ message: 'Faculty must register with their JUIT email (@juitsolan.in)' });
+    }
     if (role === 'driver' && email.endsWith('@juitsolan.in')) {
       return res.status(400).json({ message: 'Drivers must register with a personal email' });
     }
