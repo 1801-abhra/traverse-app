@@ -127,22 +127,23 @@ router.put('/admin/block/:id', async (req, res) => {
   }
 });
 // Admin login
-router.post('/admin/login', async (req, res) => {
+router.put('/admin/verify/:id', async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (
-      email === process.env.ADMIN_EMAIL &&
-      password === process.env.ADMIN_PASSWORD
-    ) {
-      return res.json({
-        name: 'Admin',
-        email,
-        role: 'admin',
-        token: generateToken('admin')
-      });
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ message: 'No token' });
+
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Admin token has id === 'admin'
+    if (decoded.id !== 'admin') {
+      return res.status(401).json({ message: 'Not authorized' });
     }
-    return res.status(401).json({ message: 'Invalid admin credentials' });
+
+    await User.findByIdAndUpdate(req.params.id, { isVerified: true });
+    res.json({ message: 'Driver verified successfully' });
   } catch (error) {
+    console.log('Verify error:', error.message);
     res.status(500).json({ message: error.message });
   }
 });
