@@ -1,13 +1,16 @@
-const SibApiV3Sdk = require('@getbrevo/brevo');
+const Brevo = require('@getbrevo/brevo');
 
-const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
-apiInstance.setApiKey(SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY);
+const defaultClient = Brevo.ApiClient.instance;
+const apiKey = defaultClient.authentications['api-key'];
+apiKey.apiKey = process.env.BREVO_API_KEY;
+
+const apiInstance = new Brevo.TransactionalEmailsApi();
 
 const sendVerificationEmail = async (email, name, token) => {
     const verifyUrl = `https://traverse-app.onrender.com/api/auth/verify-email/${token}`;
 
     try {
-        const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+        const sendSmtpEmail = new Brevo.SendSmtpEmail();
         sendSmtpEmail.subject = '✅ Verify your Traverse-Unicab account';
         sendSmtpEmail.to = [{ email, name }];
         sendSmtpEmail.sender = { name: 'Traverse-Unicab', email: 'traverseuni@gmail.com' };
@@ -36,9 +39,8 @@ const sendVerificationEmail = async (email, name, token) => {
         </p>
       </div>
     `;
-
         const result = await apiInstance.sendTransacEmail(sendSmtpEmail);
-        console.log('Verification email sent:', result);
+        console.log('Verification email sent:', result.body?.messageId);
     } catch (err) {
         console.log('Email error:', err.message);
     }
@@ -48,7 +50,7 @@ const sendPasswordResetEmail = async (email, name, token) => {
     const resetUrl = `https://traverse-unicab.vercel.app/reset-password/${token}`;
 
     try {
-        const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+        const sendSmtpEmail = new Brevo.SendSmtpEmail();
         sendSmtpEmail.subject = '🔑 Reset your Traverse-Unicab password';
         sendSmtpEmail.to = [{ email, name }];
         sendSmtpEmail.sender = { name: 'Traverse-Unicab', email: 'traverseuni@gmail.com' };
@@ -77,9 +79,8 @@ const sendPasswordResetEmail = async (email, name, token) => {
         </p>
       </div>
     `;
-
         const result = await apiInstance.sendTransacEmail(sendSmtpEmail);
-        console.log('Reset email sent:', result);
+        console.log('Reset email sent:', result.body?.messageId);
     } catch (err) {
         console.log('Email error:', err.message);
     }
