@@ -259,6 +259,16 @@ router.post('/reset-password/:token', async (req, res) => {
   }
 });
 
+// Verify driver (admin)
+router.put('/admin/verify/:id', protect, async (req, res) => {
+  try {
+    await User.findByIdAndUpdate(req.params.id, { isVerified: true });
+    res.json({ message: 'Driver verified successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 module.exports = router;
 // Save FCM token
 router.post('/save-token', protect, async (req, res) => {
