@@ -43,18 +43,22 @@ router.post('/register', async (req, res) => {
     });
     await user.save();
 
-    // Send verification email
-    await sendVerificationEmail(email, name, verificationToken);
-
-    return res.status(201).json({
-      message: 'Registration successful! Please check your email to verify your account.'
-    });
+    // Send verification email only for students and faculty
+    if (role !== 'driver') {
+      await sendVerificationEmail(email, name, verificationToken);
+      return res.status(201).json({
+        message: 'Registration successful! Please check your email to verify your account.'
+      });
+    } else {
+      return res.status(201).json({
+        message: 'Registration successful! Your account is pending admin verification.'
+      });
+    }
   } catch (error) {
     console.log('Register error:', error.message);
     return res.status(500).json({ message: error.message });
   }
 });
-
 // Login
 router.post('/login', async (req, res) => {
   try {
