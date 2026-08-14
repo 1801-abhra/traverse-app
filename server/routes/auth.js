@@ -4,8 +4,7 @@ const User = require('../models/User');
 const router = express.Router();
 const { protect } = require('../middleware/auth');
 const crypto = require('crypto');
-const { sendVerificationEmail } = require('../utils/email');
-
+const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/email');
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 };
@@ -207,6 +206,50 @@ router.post('/resend-verification', async (req, res) => {
 
     await sendVerificationEmail(email, user.name, verificationToken);
     res.json({ message: 'Verification email sent!' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Forgot password - send reset email
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: 'No account found with this email' });
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpiry = resetExpiry;
+    await user.save();
+
+    await sendPasswordResetEmail(email, user.name, resetToken);
+
+    res.json({ message: 'Password reset email sent! Check your inbox.' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Reset password
+router.post('/reset-password/:token', async (req, res) => {
+  try {
+    const { password } = req.body;
+    const user = await User.findOne({
+      resetPasswordToken: req.params.token,
+      resetPasswordExpiry: { $gt: new Date() }
+    });
+
+    if (!user) return res.status(400).json({ message: 'Invalid or expired reset link' });
+
+    user.password = password;
+    user.resetPasswordToken = null;
+    user.resetPasswordExpiry = null;
+    await user.save();
+
+    res.json({ message: 'Password reset successful! You can now login.' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
