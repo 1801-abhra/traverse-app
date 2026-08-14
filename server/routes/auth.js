@@ -68,20 +68,24 @@ router.post('/login', async (req, res) => {
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
-    // Check if user is blocked
     if (user.isBlocked) {
       return res.status(403).json({
         message: 'Your account has been blocked by admin. Please email traverseuni@gmail.com to resolve.'
       });
     }
+
     // Check if email is verified
-    if (!user.isVerified) {
+    if (!user.isVerified && user.role !== 'driver') {
       return res.status(401).json({
         message: 'Please verify your email first. Check your inbox for the verification link.'
       });
     }
-    if (user.role === 'student' && !email.endsWith('@juitsolan.in')) {
-      return res.status(401).json({ message: 'Students must use their JUIT email' });
+
+    // Check if driver is pending admin verification
+    if (!user.isVerified && user.role === 'driver') {
+      return res.status(401).json({
+        message: 'Your account is pending admin verification. Please wait for approval.'
+      });
     }
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
