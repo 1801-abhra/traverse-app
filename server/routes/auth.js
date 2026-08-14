@@ -264,8 +264,22 @@ router.post('/reset-password/:token', async (req, res) => {
 });
 
 // Verify driver (admin)
-router.put('/admin/verify/:id', protect, async (req, res) => {
+router.put('/admin/verify/:id', async (req, res) => {
   try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ message: 'No token' });
+
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Check if admin
+    if (decoded.id !== 'admin') {
+      const user = await User.findById(decoded.id);
+      if (!user || user.email !== process.env.ADMIN_EMAIL) {
+        return res.status(401).json({ message: 'Not authorized' });
+      }
+    }
+
     await User.findByIdAndUpdate(req.params.id, { isVerified: true });
     res.json({ message: 'Driver verified successfully' });
   } catch (error) {
