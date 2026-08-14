@@ -288,6 +288,26 @@ router.put('/admin/verify/:id', async (req, res) => {
   }
 });
 
+router.post('/admin/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (
+      email === process.env.ADMIN_EMAIL &&
+      password === process.env.ADMIN_PASSWORD
+    ) {
+      return res.json({
+        name: 'Admin',
+        email,
+        role: 'admin',
+        token: generateToken('admin')
+      });
+    }
+    return res.status(401).json({ message: 'Invalid admin credentials' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 module.exports = router;
 // Save FCM token
 router.post('/save-token', protect, async (req, res) => {
