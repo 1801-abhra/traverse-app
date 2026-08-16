@@ -14,31 +14,7 @@ const sendPushNotification = async (admin, fcmToken, title, body) => {
           Urgency: 'high',
           TTL: '60'
         },
-        data: { title, body },
-        notification: {
-          title,
-          body,
-          icon: '/logo192.png',
-          badge: '/logo192.png',
-          vibrate: [200, 100, 200, 100, 200],
-          requireInteraction: title.includes('New Ride'),
-          tag: 'ride-request'
-        }
-      },
-      android: {
-        priority: 'high',
-        notification: {
-          sound: 'default',
-          channelId: 'ride-requests'
-        }
-      },
-      apns: {
-        payload: {
-          aps: {
-            sound: 'default',
-            badge: 1
-          }
-        }
+        data: { title, body }
       }
     });
     console.log('Push sent successfully!');
