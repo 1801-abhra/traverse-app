@@ -8,17 +8,36 @@ const sendPushNotification = async (admin, fcmToken, title, body) => {
   try {
     await admin.messaging().send({
       token: fcmToken,
-      data: {
-        title,
-        body
-      },
+      data: { title, body },
       webpush: {
         headers: {
-          Urgency: 'high'
+          Urgency: 'high',
+          TTL: '60'
         },
-        data: {
+        data: { title, body },
+        notification: {
           title,
-          body
+          body,
+          icon: '/logo192.png',
+          badge: '/logo192.png',
+          vibrate: [200, 100, 200, 100, 200],
+          requireInteraction: title.includes('New Ride'),
+          tag: 'ride-request'
+        }
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          sound: 'default',
+          channelId: 'ride-requests'
+        }
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: 'default',
+            badge: 1
+          }
         }
       }
     });
