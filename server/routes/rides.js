@@ -20,6 +20,15 @@ const sendPushNotification = async (admin, fcmToken, title, body) => {
     console.log('Push sent successfully!');
   } catch (error) {
     console.log('Push notification error:', error.message);
+    // If token is invalid, clear it from database
+    if (error.message.includes('unregistered') || error.message.includes('invalid')) {
+      try {
+        await User.updateOne({ fcmToken }, { fcmToken: null });
+        console.log('Cleared invalid FCM token');
+      } catch (e) {
+        console.log('Error clearing token:', e.message);
+      }
+    }
   }
 };
 // Book a ride (student)
