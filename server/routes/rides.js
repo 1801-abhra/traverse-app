@@ -8,19 +8,20 @@ const sendPushNotification = async (admin, fcmToken, title, body) => {
   try {
     await admin.messaging().send({
       token: fcmToken,
-      data: { title, body },
+      data: {
+        title,
+        body
+      },
       webpush: {
-        headers: {
-          Urgency: 'high',
-          TTL: '60'
-        },
-        data: { title, body }
+        data: {
+          title,
+          body
+        }
       }
     });
     console.log('Push sent successfully!');
   } catch (error) {
     console.log('Push notification error:', error.message);
-    // If token is invalid, clear it from database
     if (error.message.includes('unregistered') || error.message.includes('invalid')) {
       try {
         await User.updateOne({ fcmToken }, { fcmToken: null });
