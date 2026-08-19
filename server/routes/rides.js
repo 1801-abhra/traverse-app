@@ -8,15 +8,9 @@ const sendPushNotification = async (admin, fcmToken, title, body) => {
   try {
     await admin.messaging().send({
       token: fcmToken,
-      data: {
-        title,
-        body
-      },
+      data: { title, body },
       webpush: {
-        data: {
-          title,
-          body
-        }
+        data: { title, body }
       }
     });
     console.log('Push sent successfully!');
