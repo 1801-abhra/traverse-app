@@ -162,12 +162,13 @@ router.put('/accept/:id', protect, async (req, res) => {
     res.json(populated);
     // Send push to student
     const student = await User.findById(ride.student);
+    console.log('Student FCM token:', student?.fcmToken ? 'exists' : 'null');
     if (student?.fcmToken) {
       await sendPushNotification(
         req.admin,
         student.fcmToken,
         '🚗 Driver Accepted!',
-        `${req.user.name} is on the way. Vehicle: ${req.user.vehicleNumber}`
+        `${req.user.name} is on the way`
       );
     }
   } catch (error) {
