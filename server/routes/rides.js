@@ -378,7 +378,9 @@ router.post('/book-shared', protect, async (req, res) => {
       isAvailable: true,
       fcmToken: { $ne: null }
     });
+    console.log('Found drivers to notify:', drivers.length);
     for (const driver of drivers) {
+      console.log('Sending to driver:', driver.name, 'token:', driver.fcmToken?.substring(0, 20));
       await sendPushNotification(
         req.admin,
         driver.fcmToken,
