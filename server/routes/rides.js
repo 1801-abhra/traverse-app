@@ -53,13 +53,17 @@ router.post('/book', protect, async (req, res) => {
       .populate('student', 'name email studentId');
     req.io.emit('new:ride', populatedRide);
 
-    // Notify drivers with matching vehicle type
+    // Notify drivers
+    console.log('Looking for drivers with vehicleType:', vehicleType);
     const drivers = await User.find({
       role: 'driver',
       vehicleType: vehicleType || '4+1',
+      isAvailable: true,
       fcmToken: { $ne: null }
     });
+    console.log('Found drivers:', drivers.length);
     for (const driver of drivers) {
+      console.log('Notifying driver:', driver.name);
       await sendPushNotification(
         req.admin,
         driver.fcmToken,
