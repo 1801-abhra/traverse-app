@@ -49,10 +49,21 @@ const rideSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  sharedWith: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    default: null
+  passengers: [{
+    student: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    name: String,
+    phone: String
+  }],
+  maxPassengers: {
+    type: Number,
+    default: 4
+  },
+  isFull: {
+    type: Boolean,
+    default: false
   },
   isMatched: {
     type: Boolean,

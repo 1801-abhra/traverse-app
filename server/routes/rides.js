@@ -361,6 +361,11 @@ router.post('/book-shared', protect, async (req, res) => {
 
     const { pickup, dropoff, fare, vehicleType, scheduledTime } = req.body;
 
+    // Set max passengers based on vehicle type
+    const maxPassengers = vehicleType === '6+1' ? 6 : 4;
+
+    const student = await User.findById(req.user._id);
+
     const ride = await Ride.create({
       student: req.user._id,
       pickup,
@@ -372,9 +377,18 @@ router.post('/book-shared', protect, async (req, res) => {
       vehicleType: vehicleType || '4+1',
       isMatched: false,
       isScheduled: scheduledTime ? true : false,
-      scheduledTime: scheduledTime || null
+      scheduledTime: scheduledTime || null,
+      maxPassengers,
+      isFull: false,
+      passengers: [{
+        student: req.user._id,
+        name: student.name,
+        phone: student.phone || ''
+      }]
     });
+
     req.io.emit('new:ride', ride);
+
     // Notify available drivers
     const drivers = await User.find({
       role: 'driver',
@@ -392,7 +406,6 @@ router.post('/book-shared', protect, async (req, res) => {
         `${pickup} → ${dropoff}`
       );
     }
-
     const availableMatches = await Ride.find({
       rideType: 'shared',
       isMatched: false,
@@ -418,25 +431,145 @@ router.post('/book-shared', protect, async (req, res) => {
 // Join existing shared ride
 router.put('/join-shared/:id', protect, async (req, res) => {
   try {
-    const ride = await Ride.findById(req.params.id).populate('student', 'name');
-    if (!ride) return res.status(404).json({ message: 'Ride not found' });
-    if (ride.isMatched) return res.status(400).json({ message: 'Ride already matched' });
+    const ride = await Ride.findById(req.params.id)
+      .populate('student', 'name phone')
+      .populate('passengers.student', 'name phone');
 
-    ride.isMatched = true;
+    if (!ride) return res.status(404).json({ message: 'Ride not found' });
+    if (ride.isFull) return res.status(400).json({ message: 'This ride is full' });
+
+    // Check if student already in passengers
+    const alreadyJoined = ride.passengers.some(
+      p => p.student._id.toString() === req.user._id.toString()
+    );
+    if (alreadyJoined) return res.status(400).json({ message: 'Already joined this ride' });
+
+    const joiningStudent = await User.findById(req.user._id);
+
+    // Add student to passengers
+    ride.passengers.push({
+      student: req.user._id,
+      name: joiningStudent.name,
+      phone: joiningStudent.phone || ''
+    });
+
+    // Recalculate fare split
+    const totalPassengers = ride.passengers.length;
+    const splitFare = Math.ceil(ride.originalFare / totalPassengers);
+    ride.fare = splitFare;
+
+    // Check if ride is now full
+    if (totalPassengers >= ride.maxPassengers) {
+      ride.isFull = true;
+      ride.isMatched = true;
+    }
+
+    // Keep sharedWith for backward compatibility
     ride.sharedWith = req.user._id;
-    ride.fare = Math.ceil(ride.originalFare / 2);
+
     await ride.save();
 
-    req.io.to(ride.student._id.toString()).emit('ride:matched', {
-      message: `${req.user.name} joined your shared ride! Fare divided to ₹${ride.fare}`,
-      ride
-    });
-    req.io.to(req.user._id.toString()).emit('ride:matched', {
-      message: `Matched with ${ride.student.name}! Fare: ₹${ride.fare}`,
-      ride
+    const updatedRide = await Ride.findById(ride._id)
+      .populate('student', 'name phone')
+      .populate('passengers.student', 'name phone');
+
+    // Notify all existing passengers about new joiner
+    for (const passenger of ride.passengers) {
+      if (passenger.student._id.toString() !== req.user._id.toString()) {
+        req.io.to(passenger.student._id.toString()).emit('ride:passenger-joined', {
+          message: `${joiningStudent.name} joined your shared ride! New fare: ₹${splitFare} each`,
+          ride: updatedRide
+        });
+        // Push notification
+        const passengerUser = await User.findById(passenger.student._id);
+        if (passengerUser?.fcmToken) {
+          await sendPushNotification(
+            req.admin,
+            passengerUser.fcmToken,
+            '👥 New Passenger Joined!',
+            `${joiningStudent.name} joined! New fare: ₹${splitFare} each`
+          );
+        }
+      }
+    }
+
+    // Notify original student too
+    req.io.to(ride.student._id.toString()).emit('ride:passenger-joined', {
+      message: `${joiningStudent.name} joined! New fare: ₹${splitFare} each`,
+      ride: updatedRide
     });
 
-    res.json({ matched: true, ride, message: `Matched with ${ride.student.name}! Fare: ₹${ride.fare}` });
+    res.json({
+      matched: true,
+      ride: updatedRide,
+      message: `Joined ride! Fare: ₹${splitFare} each (${totalPassengers} passengers)`
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.put('/leave-shared/:id', protect, async (req, res) => {
+  try {
+    const ride = await Ride.findById(req.params.id)
+      .populate('passengers.student', 'name phone');
+
+    if (!ride) return res.status(404).json({ message: 'Ride not found' });
+
+    const leavingStudent = await User.findById(req.user._id);
+
+    // Remove student from passengers
+    ride.passengers = ride.passengers.filter(
+      p => p.student._id.toString() !== req.user._id.toString()
+    );
+
+    // Recalculate fare
+    const totalPassengers = ride.passengers.length;
+    const splitFare = totalPassengers > 0 ? Math.ceil(ride.originalFare / totalPassengers) : ride.originalFare;
+    ride.fare = splitFare;
+    ride.isFull = false;
+
+    // If only 1 passenger left reset isMatched
+    if (totalPassengers <= 1) {
+      ride.isMatched = false;
+      ride.sharedWith = null;
+    }
+
+    await ride.save();
+
+    const updatedRide = await Ride.findById(ride._id)
+      .populate('student', 'name phone')
+      .populate('passengers.student', 'name phone');
+
+    // Notify remaining passengers
+    for (const passenger of ride.passengers) {
+      req.io.to(passenger.student._id.toString()).emit('ride:passenger-left', {
+        message: `${leavingStudent.name} left the ride. New fare: ₹${splitFare} each`,
+        ride: updatedRide
+      });
+      const passengerUser = await User.findById(passenger.student._id);
+      if (passengerUser?.fcmToken) {
+        await sendPushNotification(
+          req.admin,
+          passengerUser.fcmToken,
+          '👤 Passenger Left',
+          `${leavingStudent.name} left. New fare: ₹${splitFare} each`
+        );
+      }
+    }
+
+    // Notify driver if ride is accepted
+    if (ride.driver) {
+      req.io.to(ride.driver.toString()).emit('ride:passenger-left', {
+        message: `${leavingStudent.name} left the shared ride`,
+        ride: updatedRide
+      });
+    }
+
+    res.json({
+      message: 'Left shared ride successfully',
+      ride: updatedRide
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
