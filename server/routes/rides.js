@@ -115,7 +115,8 @@ router.get('/driver-active', protect, async (req, res) => {
       status: { $in: ['accepted', 'ontheway'] }
     })
       .populate('student', 'name email studentId phone')
-      .populate('driver', 'name vehicleNumber phone');
+      .populate('driver', 'name vehicleNumber phone')
+      .populate('passengers.student', 'name phone');
     res.json(ride || null);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -683,11 +684,10 @@ router.put('/pre-accept/:id', protect, async (req, res) => {
 
     ride.driver = req.user._id;
     await ride.save();
-
     const populated = await Ride.findById(ride._id)
-      .populate('driver', 'name vehicleNumber phone')
-      .populate('student', 'name phone studentId');
-
+      .populate('driver', 'name vehicleNumber phone carName carModel')
+      .populate('student', 'name email studentId phone')
+      .populate('passengers.student', 'name phone');
     // Notify student
     req.io.to(ride.student.toString()).emit('ride:pre-accepted', {
       message: `Driver ${req.user.name} will pick you up at scheduled time!`,
