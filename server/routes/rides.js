@@ -590,10 +590,12 @@ router.get('/shared/available', protect, async (req, res) => {
   try {
     const rides = await Ride.find({
       rideType: 'shared',
-      isMatched: false,
+      isFull: false,
       status: 'searching',
-      student: { $ne: req.user._id }
-    }).populate('student', 'name studentId');
+      student: { $ne: req.user._id },
+      'passengers.student': { $ne: req.user._id }
+    }).populate('student', 'name studentId phone')
+      .populate('passengers.student', 'name phone');
     res.json(rides);
   } catch (error) {
     res.status(500).json({ message: error.message });
