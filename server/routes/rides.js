@@ -86,8 +86,9 @@ router.get('/available', protect, async (req, res) => {
       vehicleType: driver.vehicleType,
       isScheduled: { $ne: true }
     })
-      .populate('student', 'name email studentId')
-      .populate('sharedWith', 'name studentId');
+      .populate('student', 'name email studentId phone')
+      .populate('sharedWith', 'name studentId')
+      .populate('passengers.student', 'name phone');
     res.json(rides);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -497,6 +498,14 @@ router.put('/join-shared/:id', protect, async (req, res) => {
     req.io.to(ride.student._id.toString()).emit('ride:passenger-joined', {
       message: `${joiningStudent.name} joined! New fare: ₹${splitFare} each`,
       ride: updatedRide
+    });
+
+    // Update driver view with new passenger count
+    req.io.emit('ride:passenger-updated', {
+      rideId: ride._id.toString(),
+      passengers: updatedRide.passengers,
+      isFull: updatedRide.isFull,
+      fare: updatedRide.fare
     });
 
     res.json({
