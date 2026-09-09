@@ -272,47 +272,121 @@ router.put('/status/:id', protect, async (req, res) => {
 // Cancel ride (student)
 router.put('/cancel/:id', protect, async (req, res) => {
   try {
-    const ride = await Ride.findById(req.params.id).populate('student', 'name');
+    const ride = await Ride.findById(req.params.id)
+      .populate('student', 'name phone')
+      .populate('passengers.student', 'name phone');
+
     if (!ride) return res.status(404).json({ message: 'Ride not found' });
     if (ride.status !== 'searching') {
       return res.status(400).json({ message: 'Cannot cancel after driver accepted' });
     }
 
-    // Check if canceller is the sharedWith student
-    if (ride.rideType === 'shared' && ride.sharedWith &&
-      ride.sharedWith.toString() === req.user._id.toString()) {
-      // Second student cancels - just remove them from shared ride
-      ride.sharedWith = null;
-      ride.isMatched = false;
-      ride.fare = ride.originalFare || ride.fare * 2;
+    const cancellingUser = await User.findById(req.user._id);
+    const isOriginalStudent = ride.student._id.toString() === req.user._id.toString();
+
+    if (isOriginalStudent) {
+      // Remove original student from passengers array
+      ride.passengers = ride.passengers.filter(
+        p => p.student._id.toString() !== req.user._id.toString()
+      );
+
+      if (ride.passengers.length === 0) {
+        // No passengers left — cancel ride completely
+        ride.status = 'cancelled';
+        await ride.save();
+        req.io.emit('ride:cancelled', { rideId: ride._id.toString() });
+        return res.json({ message: 'Ride cancelled' });
+      }
+
+      // Assign first passenger as new original student
+      const newStudent = ride.passengers[0];
+      ride.student = newStudent.student._id;
+
+      // Recalculate fare
+      const splitFare = Math.ceil(ride.originalFare / ride.passengers.length);
+      ride.fare = splitFare;
+      ride.isFull = false;
+      ride.isMatched = ride.passengers.length > 1;
+
       await ride.save();
 
-      // Notify first student
-      req.io.to(ride.student._id.toString()).emit('ride:shared-cancelled', {
-        message: 'Your shared ride partner cancelled. You can find a new match or continue alone.'
+      const updatedRide = await Ride.findById(ride._id)
+        .populate('student', 'name phone')
+        .populate('passengers.student', 'name phone');
+
+      // Notify all remaining passengers
+      for (const passenger of ride.passengers) {
+        req.io.to(passenger.student._id.toString()).emit('ride:passenger-left', {
+          message: `${cancellingUser.name} cancelled. You are now the ride organizer! New fare: ₹${splitFare} each`,
+          ride: updatedRide
+        });
+        // Push notification
+        const passengerUser = await User.findById(passenger.student._id);
+        if (passengerUser?.fcmToken) {
+          await sendPushNotification(
+            req.admin,
+            passengerUser.fcmToken,
+            '⚠️ Ride Update',
+            `${cancellingUser.name} cancelled. You are now ride organizer!`
+          );
+        }
+      }
+
+      // Notify driver if accepted
+      if (ride.driver) {
+        req.io.to(ride.driver.toString()).emit('ride:passenger-left', {
+          message: `${cancellingUser.name} left the ride`,
+          ride: updatedRide
+        });
+      }
+
+      // Remove from driver available list if no driver yet
+      req.io.emit('ride:passenger-updated', {
+        rideId: ride._id.toString(),
+        passengers: updatedRide.passengers,
+        isFull: updatedRide.isFull,
+        fare: updatedRide.fare
       });
 
-      return res.json({ message: 'Left shared ride successfully', ride });
-    }
+      return res.json({ message: 'Left ride successfully', ride: updatedRide });
 
-    // Regular cancel — cancel entire ride
-    ride.status = 'cancelled';
-    await ride.save();
-    req.io.emit('ride:cancelled', { rideId: ride._id.toString() });
+    } else {
+      // Non-original student trying to cancel — just leave
+      ride.passengers = ride.passengers.filter(
+        p => p.student._id.toString() !== req.user._id.toString()
+      );
 
-    // Notify sharedWith student if exists
-    if (ride.sharedWith) {
-      req.io.to(ride.sharedWith.toString()).emit('ride:shared-cancelled', {
-        message: 'The original student cancelled the shared ride.'
+      const splitFare = Math.ceil(ride.originalFare / ride.passengers.length);
+      ride.fare = splitFare;
+      ride.isFull = false;
+      if (ride.passengers.length <= 1) ride.isMatched = false;
+
+      await ride.save();
+
+      const updatedRide = await Ride.findById(ride._id)
+        .populate('student', 'name phone')
+        .populate('passengers.student', 'name phone');
+
+      // Notify remaining passengers
+      for (const passenger of ride.passengers) {
+        req.io.to(passenger.student._id.toString()).emit('ride:passenger-left', {
+          message: `${cancellingUser.name} left the ride. New fare: ₹${splitFare} each`,
+          ride: updatedRide
+        });
+      }
+
+      // Notify original student
+      req.io.to(ride.student._id.toString()).emit('ride:passenger-left', {
+        message: `${cancellingUser.name} left the ride. New fare: ₹${splitFare} each`,
+        ride: updatedRide
       });
-    }
 
-    res.json(ride);
+      return res.json({ message: 'Left ride successfully', ride: updatedRide });
+    }
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
-
 // Ride history
 router.get('/history', protect, async (req, res) => {
   try {
