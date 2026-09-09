@@ -9,22 +9,7 @@ const protect = async (req, res, next) => {
     try {
       token = req.headers.authorization.split(' ')[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await User.findById(decoded.id).select('-password');
-
-      if (!user) {
-        return res.status(401).json({ message: 'User not found' });
-      }
-
-      // Only check if BOTH exist and don't match
-      const sessionToken = req.headers['x-session-token'];
-      if (sessionToken && user.sessionToken && user.sessionToken !== sessionToken) {
-        return res.status(401).json({
-          message: 'SESSION_EXPIRED',
-          reason: 'You have been logged in from another device.'
-        });
-      }
-
-      req.user = user;
+      req.user = await User.findById(decoded.id).select('-password');
       return next();
     } catch (error) {
       return res.status(401).json({ message: 'Not authorized' });
