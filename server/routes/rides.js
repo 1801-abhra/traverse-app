@@ -85,7 +85,7 @@ router.get('/available', protect, async (req, res) => {
       status: 'searching',
       vehicleType: driver.vehicleType,
       isScheduled: { $ne: true },
-      driver: null  // Only show unassigned rides
+      driver: null
     })
       .populate('student', 'name email studentId phone')
       .populate('passengers.student', 'name phone');
