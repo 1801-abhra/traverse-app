@@ -314,6 +314,15 @@ router.post('/admin/login', async (req, res) => {
   }
 });
 
+router.post('/logout', protect, async (req, res) => {
+  try {
+    await User.findByIdAndUpdate(req.user._id, { sessionToken: null });
+    res.json({ message: 'Logged out successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 module.exports = router;
 // Save FCM token
 router.post('/save-token', protect, async (req, res) => {
