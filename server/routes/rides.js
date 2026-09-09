@@ -161,7 +161,7 @@ router.put('/accept/:id', protect, async (req, res) => {
     const populated = await Ride.findById(ride._id)
       .populate('driver', 'name vehicleNumber phone carName carModel')
       .populate('student', 'name email studentId phone')
-      .populate('sharedWith', 'name');
+      .populate('passengers.student', 'name phone');
     req.io.to(ride.student.toString()).emit('ride:accepted', populated);
     if (ride.sharedWith) {
       req.io.to(ride.sharedWith.toString()).emit('ride:accepted', populated);
