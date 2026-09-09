@@ -84,13 +84,14 @@ router.get('/available', protect, async (req, res) => {
     const rides = await Ride.find({
       status: 'searching',
       vehicleType: driver.vehicleType,
-      isScheduled: { $ne: true }
+      isScheduled: { $ne: true },
+      driver: null  // Only show unassigned rides
     })
       .populate('student', 'name email studentId phone')
-      .populate('sharedWith', 'name studentId')
       .populate('passengers.student', 'name phone');
     res.json(rides);
   } catch (error) {
+    console.log('Available rides error:', error.message);
     res.status(500).json({ message: error.message });
   }
 });
