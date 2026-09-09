@@ -699,13 +699,22 @@ router.put('/leave-shared/:id', protect, async (req, res) => {
 // Get available shared rides
 router.get('/shared/available', protect, async (req, res) => {
   try {
-    const rides = await Ride.find({
+    const { pickup, dropoff } = req.query;
+
+    const filter = {
       rideType: 'shared',
       isFull: false,
       status: 'searching',
       student: { $ne: req.user._id },
       'passengers.student': { $ne: req.user._id }
-    }).populate('student', 'name studentId phone')
+    };
+
+    // Filter by matching pickup and dropoff if provided
+    if (pickup) filter.pickup = pickup;
+    if (dropoff) filter.dropoff = dropoff;
+
+    const rides = await Ride.find(filter)
+      .populate('student', 'name studentId phone')
       .populate('passengers.student', 'name phone');
     res.json(rides);
   } catch (error) {
