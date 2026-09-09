@@ -46,6 +46,10 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  sessionToken: {
+    type: String,
+    default: null
+  },
   isBlocked: {
     type: Boolean,
     default: false

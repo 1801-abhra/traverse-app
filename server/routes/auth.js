@@ -92,6 +92,12 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+
+    // Generate unique session token
+    const sessionToken = crypto.randomBytes(32).toString('hex');
+    user.sessionToken = sessionToken;
+    await user.save();
+
     return res.json({
       _id: user._id,
       name: user.name,
