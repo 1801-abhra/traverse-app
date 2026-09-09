@@ -10,7 +10,6 @@ const authRoutes = require('./routes/auth');
 const rideRoutes = require('./routes/rides');
 
 // Initialize Firebase Admin
-// Initialize Firebase Admin
 try {
   const privateKey = process.env.FIREBASE_PRIVATE_KEY
     .replace(/\\n/g, '\n')
@@ -46,7 +45,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-session-token']
 }));
 app.use(express.json());
 
@@ -54,7 +53,7 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-session-token');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
