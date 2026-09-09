@@ -15,13 +15,12 @@ const protect = async (req, res, next) => {
         return res.status(401).json({ message: 'User not found' });
       }
 
-      // Check session token
+      // Only check if BOTH exist and don't match
       const sessionToken = req.headers['x-session-token'];
-      if (user.role !== 'admin' && sessionToken && user.sessionToken &&
-        user.sessionToken !== sessionToken) {
+      if (sessionToken && user.sessionToken && user.sessionToken !== sessionToken) {
         return res.status(401).json({
           message: 'SESSION_EXPIRED',
-          reason: 'You have been logged in from another device. Please login again.'
+          reason: 'You have been logged in from another device.'
         });
       }
 
