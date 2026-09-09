@@ -147,7 +147,6 @@ router.put('/accept/:id', protect, async (req, res) => {
     if (ride.status !== 'searching') {
       return res.status(400).json({ message: 'Ride no longer available' });
     }
-    // Check if driver already has active ride
     const driverActiveRide = await Ride.findOne({
       driver: req.user._id,
       status: { $in: ['accepted', 'ontheway'] }
@@ -158,18 +157,28 @@ router.put('/accept/:id', protect, async (req, res) => {
     ride.driver = req.user._id;
     ride.status = 'accepted';
     await ride.save();
+
     const populated = await Ride.findById(ride._id)
       .populate('driver', 'name vehicleNumber phone carName carModel')
       .populate('student', 'name email studentId phone')
       .populate('passengers.student', 'name phone');
+
+    // Notify original student
     req.io.to(ride.student.toString()).emit('ride:accepted', populated);
-    if (ride.sharedWith) {
-      req.io.to(ride.sharedWith.toString()).emit('ride:accepted', populated);
+
+    // Notify ALL passengers
+    if (populated.passengers && populated.passengers.length > 0) {
+      for (const passenger of populated.passengers) {
+        if (passenger.student._id.toString() !== ride.student.toString()) {
+          req.io.to(passenger.student._id.toString()).emit('ride:accepted', populated);
+        }
+      }
     }
+
     res.json(populated);
-    // Send push to student
+
+    // Send push to original student
     const student = await User.findById(ride.student);
-    console.log('Student FCM token:', student?.fcmToken ? 'exists' : 'null');
     if (student?.fcmToken) {
       await sendPushNotification(
         req.admin,
@@ -177,6 +186,23 @@ router.put('/accept/:id', protect, async (req, res) => {
         '🚗 Driver Accepted!',
         `${req.user.name} is on the way`
       );
+    }
+
+    // Send push to all passengers
+    if (populated.passengers && populated.passengers.length > 0) {
+      for (const passenger of populated.passengers) {
+        if (passenger.student._id.toString() !== ride.student.toString()) {
+          const passengerUser = await User.findById(passenger.student._id);
+          if (passengerUser?.fcmToken) {
+            await sendPushNotification(
+              req.admin,
+              passengerUser.fcmToken,
+              '🚗 Driver Accepted!',
+              `${req.user.name} is on the way`
+            );
+          }
+        }
+      }
     }
   } catch (error) {
     console.log('Accept error:', error.message);
@@ -200,34 +226,44 @@ router.put('/reject/:id', protect, async (req, res) => {
 router.put('/status/:id', protect, async (req, res) => {
   try {
     const { status } = req.body;
-    const ride = await Ride.findById(req.params.id);
+    const ride = await Ride.findById(req.params.id)
+      .populate('student', 'name phone')
+      .populate('passengers.student', 'name phone');
+
     if (!ride) return res.status(404).json({ message: 'Ride not found' });
+
     ride.status = status;
     await ride.save();
+
+    const populated = await Ride.findById(ride._id)
+      .populate('driver', 'name vehicleNumber phone carName carModel')
+      .populate('student', 'name email studentId phone')
+      .populate('passengers.student', 'name phone');
+
     // Notify original student
-    req.io.to(ride.student.toString()).emit('ride:updated', ride);
-    // Notify shared student if exists
-    if (ride.sharedWith) {
-      req.io.to(ride.sharedWith.toString()).emit('ride:updated', ride);
+    req.io.to(ride.student._id.toString()).emit('ride:updated', populated);
+
+    // Notify ALL passengers
+    if (populated.passengers && populated.passengers.length > 0) {
+      for (const passenger of populated.passengers) {
+        if (passenger.student._id.toString() !== ride.student._id.toString()) {
+          req.io.to(passenger.student._id.toString()).emit('ride:updated', populated);
+        }
+      }
     }
-    res.json(ride);
-    const student = await User.findById(ride.student);
-    if (ride.status === 'ontheway' && student?.fcmToken) {
-      await sendPushNotification(
-        req.admin,
-        student.fcmToken,
-        '🚖 Driver On The Way!',
-        'Your driver is heading to your pickup location'
-      );
+
+    // Push notifications
+    const student = await User.findById(ride.student._id);
+    if (student?.fcmToken) {
+      if (status === 'ontheway') {
+        await sendPushNotification(req.admin, student.fcmToken, '🚗 Driver On The Way!', 'Your driver is heading to pickup');
+      }
+      if (status === 'completed') {
+        await sendPushNotification(req.admin, student.fcmToken, '✅ Ride Completed!', 'Please rate your experience');
+      }
     }
-    if (ride.status === 'completed' && student?.fcmToken) {
-      await sendPushNotification(
-        req.admin,
-        student.fcmToken,
-        '✅ Ride Completed!',
-        'Hope you had a great ride! Please rate your experience.'
-      );
-    }
+
+    res.json(populated);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
