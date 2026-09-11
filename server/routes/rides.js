@@ -50,7 +50,7 @@ router.post('/book', protect, async (req, res) => {
     });
 
     const populatedRide = await Ride.findById(ride._id)
-      .populate('student', 'name email studentId');
+      .populate('student', 'name email studentId role');
     req.io.emit('new:ride', populatedRide);
 
     // Notify drivers
