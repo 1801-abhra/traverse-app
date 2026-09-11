@@ -80,17 +80,16 @@ router.post('/book', protect, async (req, res) => {
 // Get available rides (driver)
 router.get('/available', protect, async (req, res) => {
   try {
-    const driver = await User.findById(req.user._id);
     const rides = await Ride.find({
       status: 'searching',
       driver: null,
       $or: [
         { isScheduled: false },
         { isScheduled: { $exists: false } },
-        { isScheduled: true, scheduledTime: { $lte: now } }
+        { isScheduled: null }
       ]
     })
-      .populate('student', 'name email studentId phone')
+      .populate('student', 'name email studentId phone role')
       .populate('passengers.student', 'name phone');
     res.json(rides);
   } catch (error) {
@@ -844,13 +843,15 @@ router.put('/pre-accept/:id', protect, async (req, res) => {
 router.get('/scheduled', protect, async (req, res) => {
   try {
     const driver = await User.findById(req.user._id);
+    const now = new Date();
     const rides = await Ride.find({
       isScheduled: true,
       status: 'searching',
       vehicleType: driver.vehicleType,
-      scheduledTime: { $gte: new Date() }
+      scheduledTime: { $gt: now },
+      driver: null
     })
-      .populate('student', 'name phone studentId')
+      .populate('student', 'name phone studentId role')
       .sort({ scheduledTime: 1 });
     res.json(rides);
   } catch (error) {
