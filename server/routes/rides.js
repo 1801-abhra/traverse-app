@@ -85,11 +85,7 @@ router.get('/available', protect, async (req, res) => {
       status: 'searching',
       driver: null,
       vehicleType: driver.vehicleType,
-      $or: [
-        { isScheduled: false },
-        { isScheduled: null },
-        { isScheduled: { $exists: false } }
-      ]
+      isScheduled: { $ne: true }
     })
       .populate('student', 'name email studentId phone role')
       .populate('passengers.student', 'name phone');
