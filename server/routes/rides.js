@@ -83,9 +83,12 @@ router.get('/available', protect, async (req, res) => {
     const driver = await User.findById(req.user._id);
     const rides = await Ride.find({
       status: 'searching',
-      vehicleType: driver.vehicleType,
-      isScheduled: { $ne: true },
-      driver: null
+      driver: null,
+      $or: [
+        { isScheduled: false },
+        { isScheduled: { $exists: false } },
+        { isScheduled: true, scheduledTime: { $lte: now } }
+      ]
     })
       .populate('student', 'name email studentId phone')
       .populate('passengers.student', 'name phone');
