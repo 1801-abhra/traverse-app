@@ -80,14 +80,12 @@ router.post('/book', protect, async (req, res) => {
 // Get available rides (driver)
 router.get('/available', protect, async (req, res) => {
   try {
+    const driver = await User.findById(req.user._id);
     const rides = await Ride.find({
       status: 'searching',
       driver: null,
-      $or: [
-        { isScheduled: false },
-        { isScheduled: { $exists: false } },
-        { isScheduled: null }
-      ]
+      vehicleType: driver.vehicleType,
+      isScheduled: { $ne: true }
     })
       .populate('student', 'name email studentId phone role')
       .populate('passengers.student', 'name phone');
