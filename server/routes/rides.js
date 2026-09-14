@@ -436,14 +436,40 @@ router.get('/my-rating', protect, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-// Admin - get all rides
 router.get('/admin/rides', async (req, res) => {
   try {
-    const rides = await Ride.find()
+    const { search = '', page = 1, limit = 20, status } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const filter = {};
+    if (status) filter.status = status;
+    if (search) {
+      const matchingUsers = await User.find({
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } }
+        ]
+      }).select('_id');
+      const userIds = matchingUsers.map(u => u._id);
+      filter.$or = [
+        { student: { $in: userIds } },
+        { driver: { $in: userIds } },
+        { pickup: { $regex: search, $options: 'i' } },
+        { dropoff: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const total = await Ride.countDocuments(filter);
+    const rides = await Ride.find(filter)
       .populate('student', 'name email studentId phone')
       .populate('driver', 'name email vehicleNumber phone')
-      .sort({ createdAt: -1 });
-    res.json(rides);
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    res.json({ rides, total, page: pageNum, pages: Math.ceil(total / limitNum) });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
