@@ -382,6 +382,23 @@ router.put('/cancel/:id', protect, async (req, res) => {
         ride: updatedRide
       });
 
+      // Notify driver if assigned
+      if (ride.driver) {
+        req.io.to(ride.driver.toString()).emit('ride:passenger-left', {
+          message: `${cancellingUser.name} left the ride`,
+          ride: updatedRide
+        });
+      }
+
+      // Broadcast passenger update to all drivers
+      req.io.emit('ride:passenger-updated', {
+        rideId: ride._id.toString(),
+        passengers: updatedRide.passengers,
+        isFull: updatedRide.isFull,
+        fare: updatedRide.fare,
+        ride: updatedRide
+      });
+
       return res.json({ message: 'Left ride successfully', ride: updatedRide });
     }
   } catch (error) {
@@ -643,12 +660,21 @@ router.put('/join-shared/:id', protect, async (req, res) => {
       ride: updatedRide
     });
 
-    // Update driver view with new passenger count
+    // Notify driver if assigned
+    if (ride.driver) {
+      req.io.to(ride.driver.toString()).emit('ride:passenger-joined', {
+        message: `${joiningStudent.name} joined the shared ride! New fare: ₹${splitFare} each`,
+        ride: updatedRide
+      });
+    }
+
+    // Update driver view with new passenger count and populated ride
     req.io.emit('ride:passenger-updated', {
       rideId: ride._id.toString(),
       passengers: updatedRide.passengers,
       isFull: updatedRide.isFull,
-      fare: updatedRide.fare
+      fare: updatedRide.fare,
+      ride: updatedRide
     });
 
     res.json({
@@ -710,13 +736,22 @@ router.put('/leave-shared/:id', protect, async (req, res) => {
       }
     }
 
-    // Notify driver if ride is accepted
+    // Notify driver if ride is accepted or assigned
     if (ride.driver) {
       req.io.to(ride.driver.toString()).emit('ride:passenger-left', {
         message: `${leavingStudent.name} left the shared ride`,
         ride: updatedRide
       });
     }
+
+    // Broadcast passenger update to all drivers
+    req.io.emit('ride:passenger-updated', {
+      rideId: ride._id.toString(),
+      passengers: updatedRide.passengers,
+      isFull: updatedRide.isFull,
+      fare: updatedRide.fare,
+      ride: updatedRide
+    });
 
     res.json({
       message: 'Left shared ride successfully',
@@ -843,8 +878,8 @@ router.put('/pre-accept/:id', protect, async (req, res) => {
     await ride.save();
     const populated = await Ride.findById(ride._id)
       .populate('driver', 'name vehicleNumber phone carName carModel')
-      .populate('student', 'name email studentId phone')
-      .populate('passengers.student', 'name phone');
+      .populate('student', 'name email studentId phone role')
+      .populate('passengers.student', 'name phone studentId role');
     // Notify student
     req.io.to(ride.student.toString()).emit('ride:pre-accepted', {
       message: `Driver ${req.user.name} will pick you up at scheduled time!`,
@@ -883,7 +918,8 @@ router.get('/scheduled', protect, async (req, res) => {
       scheduledTime: { $gt: now },
       driver: null
     })
-      .populate('student', 'name phone studentId role')
+      .populate('student', 'name phone studentId role email')
+      .populate('passengers.student', 'name phone studentId role')
       .sort({ scheduledTime: 1 });
     res.json(rides);
   } catch (error) {
@@ -899,7 +935,8 @@ router.get('/my-scheduled', protect, async (req, res) => {
       isScheduled: true,
       status: 'searching'
     })
-      .populate('student', 'name phone studentId')
+      .populate('student', 'name phone studentId role email')
+      .populate('passengers.student', 'name phone studentId role')
       .sort({ scheduledTime: 1 });
     res.json(rides);
   } catch (error) {
