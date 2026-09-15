@@ -527,7 +527,11 @@ router.post('/book-shared', protect, async (req, res) => {
       }]
     });
 
-    req.io.emit('new:ride', ride);
+    const populatedRide = await Ride.findById(ride._id)
+      .populate('student', 'name email studentId phone role')
+      .populate('passengers.student', 'name phone');
+
+    req.io.emit('new:ride', populatedRide || ride);
 
     // Notify available drivers
     const drivers = await User.find({
@@ -846,6 +850,9 @@ router.put('/pre-accept/:id', protect, async (req, res) => {
       message: `Driver ${req.user.name} will pick you up at scheduled time!`,
       ride: populated
     });
+
+    // Notify other drivers that scheduled ride is claimed
+    req.io.emit('ride:scheduled-claimed', { rideId: ride._id, driverId: req.user._id });
 
     // Send push to student
     const student = await User.findById(ride.student);
