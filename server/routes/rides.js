@@ -128,10 +128,11 @@ router.get('/driver-active', protect, async (req, res) => {
 router.get('/drivers-available', protect, async (req, res) => {
   try {
     const { vehicleType } = req.query;
+    const normalizedType = vehicleType ? vehicleType.replace(/ /g, '+') : '4+1';
     const availableDrivers = await User.find({
       role: 'driver',
       isAvailable: true,
-      vehicleType: vehicleType || '4+1'
+      vehicleType: normalizedType
     });
     res.json({ available: availableDrivers.length > 0, count: availableDrivers.length });
   } catch (error) {
