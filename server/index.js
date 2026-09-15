@@ -70,14 +70,54 @@ io.on('connection', (socket) => {
   console.log('Socket connected:', socket.id);
 
   socket.on('join', ({ userId, role }) => {
-    socket.join(userId);
-    console.log(`${role} ${userId} joined room`);
+    if (userId) {
+      socket.join(userId.toString());
+      console.log(`${role || 'user'} ${userId} joined room`);
+    }
   });
 
-  socket.on('driver:location', ({ rideId, studentId, sharedWithId, lat, lng }) => {
-    io.to(studentId).emit('driver:location', { lat, lng });
-    if (sharedWithId) {
-      io.to(sharedWithId).emit('driver:location', { lat, lng });
+  socket.on('join:ride', (rideId) => {
+    if (rideId) {
+      const cleanRideId = typeof rideId === 'object' ? (rideId._id || rideId.id || rideId.toString()) : rideId.toString();
+      socket.join(`ride:${cleanRideId}`);
+      console.log(`Socket ${socket.id} joined ride:${cleanRideId}`);
+    }
+  });
+
+  socket.on('driver:location', ({ rideId, studentId, sharedWithId, passengers, lat, lng }) => {
+    if (lat === undefined || lng === undefined) return;
+    
+    const locationData = { rideId, lat, lng };
+
+    // Broadcast to dedicated ride room
+    if (rideId) {
+      const cleanRideId = typeof rideId === 'object' ? (rideId._id || rideId.id || rideId.toString()) : rideId.toString();
+      io.to(`ride:${cleanRideId}`).emit('driver:location', locationData);
+    }
+
+    const getCleanId = (id) => {
+      if (!id) return null;
+      if (typeof id === 'object') return id._id || id.id || id.toString();
+      return id.toString();
+    };
+
+    const sid = getCleanId(studentId);
+    if (sid) {
+      io.to(sid).emit('driver:location', locationData);
+    }
+
+    const swid = getCleanId(sharedWithId);
+    if (swid) {
+      io.to(swid).emit('driver:location', locationData);
+    }
+
+    if (Array.isArray(passengers)) {
+      passengers.forEach(p => {
+        const pid = getCleanId(p?.student || p);
+        if (pid) {
+          io.to(pid).emit('driver:location', locationData);
+        }
+      });
     }
   });
 
