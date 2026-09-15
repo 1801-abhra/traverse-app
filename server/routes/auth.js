@@ -103,6 +103,9 @@ router.post('/login', async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      vehicleType: user.vehicleType,
+      vehicleNumber: user.vehicleNumber,
+      phone: user.phone,
       token: generateToken(user._id)
     });
   } catch (error) {

@@ -69,10 +69,15 @@ mongoose.connect(process.env.MONGO_URI)
 io.on('connection', (socket) => {
   console.log('Socket connected:', socket.id);
 
-  socket.on('join', ({ userId, role }) => {
+  socket.on('join', ({ userId, role, vehicleType }) => {
     if (userId) {
       socket.join(userId.toString());
       console.log(`${role || 'user'} ${userId} joined room`);
+      if (vehicleType) {
+        const cleanType = vehicleType.toString().replace(/ /g, '+').trim();
+        socket.join(`vehicle:${cleanType}`);
+        console.log(`Socket joined vehicle:${cleanType}`);
+      }
     }
   });
 
