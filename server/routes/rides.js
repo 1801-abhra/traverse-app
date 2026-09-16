@@ -167,6 +167,12 @@ router.put('/accept/:id', protect, async (req, res) => {
     // Notify original student
     req.io.to(ride.student.toString()).emit('ride:accepted', populated);
 
+    // Remove accepted ride from other drivers' searching lists
+    req.io.emit('ride:accepted-by-driver', { 
+      rideId: ride._id.toString(),
+      driverId: req.user._id.toString()
+    });
+
     // Notify ALL passengers
     if (populated.passengers && populated.passengers.length > 0) {
       for (const passenger of populated.passengers) {
