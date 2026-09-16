@@ -1,6 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Ride = require('../models/Ride');
 const router = express.Router();
 const { protect } = require('../middleware/auth');
 const crypto = require('crypto');
@@ -113,28 +114,113 @@ router.post('/login', async (req, res) => {
     return res.status(500).json({ message: error.message });
   }
 });
-// Admin - get all users
+// Admin - get platform overview statistics
+router.get('/admin/stats', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ message: 'No token' });
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.id !== 'admin') {
+      const user = await User.findById(decoded.id);
+      if (!user || user.email !== process.env.ADMIN_EMAIL) {
+        return res.status(401).json({ message: 'Not authorized' });
+      }
+    }
+
+    const [
+      totalStudents,
+      totalFaculty,
+      totalDrivers,
+      pendingDrivers,
+      blockedUsers,
+      totalRides,
+      activeRides,
+      completedRides,
+      cancelledRides,
+      revenueResult
+    ] = await Promise.all([
+      User.countDocuments({ role: 'student' }),
+      User.countDocuments({ role: 'faculty' }),
+      User.countDocuments({ role: 'driver' }),
+      User.countDocuments({ role: 'driver', isVerified: false }),
+      User.countDocuments({ isBlocked: true }),
+      Ride.countDocuments({}),
+      Ride.countDocuments({ status: { $in: ['searching', 'accepted', 'ontheway'] } }),
+      Ride.countDocuments({ status: 'completed' }),
+      Ride.countDocuments({ status: 'cancelled' }),
+      Ride.aggregate([
+        { $match: { status: 'completed' } },
+        { $group: { _id: null, total: { $sum: '$fare' } } }
+      ])
+    ]);
+
+    const totalRevenue = revenueResult && revenueResult.length > 0 ? revenueResult[0].total : 0;
+
+    res.json({
+      totalStudents,
+      totalFaculty,
+      totalDrivers,
+      pendingDrivers,
+      blockedUsers,
+      totalRides,
+      activeRides,
+      completedRides,
+      cancelledRides,
+      totalRevenue
+    });
+  } catch (error) {
+    console.error('Admin stats error:', error.message);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Admin - get paginated users with robust search and role/status filtering
 router.get('/admin/users', async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader) return res.status(401).json({ message: 'No token' });
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.id !== 'admin') return res.status(401).json({ message: 'Not authorized' });
+    if (decoded.id !== 'admin') {
+      const user = await User.findById(decoded.id);
+      if (!user || user.email !== process.env.ADMIN_EMAIL) {
+        return res.status(401).json({ message: 'Not authorized' });
+      }
+    }
 
-    const { search = '', page = 1, limit = 20, role } = req.query;
-    const pageNum = parseInt(page);
-    const limitNum = parseInt(limit);
+    const { search = '', page = 1, limit = 15, role, statusFilter } = req.query;
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.max(1, parseInt(limit) || 15);
     const skip = (pageNum - 1) * limitNum;
 
     const filter = {};
-    if (role) filter.role = role;
-    if (search) {
+    if (role && role !== 'all') {
+      filter.role = role;
+    }
+
+    if (statusFilter === 'pending') {
+      filter.isVerified = false;
+    } else if (statusFilter === 'blocked') {
+      filter.isBlocked = true;
+    } else if (statusFilter === 'active') {
+      filter.isBlocked = { $ne: true };
+    } else if (statusFilter === 'at_risk') {
+      filter.cancelCount = { $gte: 3 };
+      filter.isBlocked = { $ne: true };
+    }
+
+    if (search && search.trim()) {
+      const q = search.trim();
       filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { phone: { $regex: search, $options: 'i' } },
-        { studentId: { $regex: search, $options: 'i' } }
+        { name: { $regex: q, $options: 'i' } },
+        { email: { $regex: q, $options: 'i' } },
+        { phone: { $regex: q, $options: 'i' } },
+        { studentId: { $regex: q, $options: 'i' } },
+        { vehicleNumber: { $regex: q, $options: 'i' } },
+        { carName: { $regex: q, $options: 'i' } },
+        { carModel: { $regex: q, $options: 'i' } },
+        { vehicleType: { $regex: q, $options: 'i' } }
       ];
     }
 
@@ -149,10 +235,11 @@ router.get('/admin/users', async (req, res) => {
       users,
       total,
       page: pageNum,
-      pages: Math.ceil(total / limitNum),
+      pages: Math.ceil(total / limitNum) || 1,
       limit: limitNum
     });
   } catch (error) {
+    console.error('Admin users error:', error.message);
     res.status(500).json({ message: error.message });
   }
 });
@@ -160,6 +247,17 @@ router.get('/admin/users', async (req, res) => {
 // Admin - block/unblock user
 router.put('/admin/block/:id', async (req, res) => {
   try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ message: 'No token' });
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.id !== 'admin') {
+      const user = await User.findById(decoded.id);
+      if (!user || user.email !== process.env.ADMIN_EMAIL) {
+        return res.status(401).json({ message: 'Not authorized' });
+      }
+    }
+
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
     user.isBlocked = !user.isBlocked;
@@ -169,22 +267,24 @@ router.put('/admin/block/:id', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-// Admin login
+
+// Admin - verify driver
 router.put('/admin/verify/:id', async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader) return res.status(401).json({ message: 'No token' });
-
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    // Admin token has id === 'admin'
     if (decoded.id !== 'admin') {
-      return res.status(401).json({ message: 'Not authorized' });
+      const user = await User.findById(decoded.id);
+      if (!user || user.email !== process.env.ADMIN_EMAIL) {
+        return res.status(401).json({ message: 'Not authorized' });
+      }
     }
 
-    await User.findByIdAndUpdate(req.params.id, { isVerified: true });
-    res.json({ message: 'Driver verified successfully' });
+    const driver = await User.findByIdAndUpdate(req.params.id, { isVerified: true }, { new: true });
+    if (!driver) return res.status(404).json({ message: 'Driver not found' });
+    res.json({ message: 'Driver verified successfully', driver });
   } catch (error) {
     console.log('Verify error:', error.message);
     res.status(500).json({ message: error.message });
@@ -302,30 +402,6 @@ router.post('/reset-password/:token', async (req, res) => {
     await user.save();
 
     res.json({ message: 'Password reset successful! You can now login.' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Verify driver (admin)
-router.put('/admin/verify/:id', async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ message: 'No token' });
-
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    // Check if admin
-    if (decoded.id !== 'admin') {
-      const user = await User.findById(decoded.id);
-      if (!user || user.email !== process.env.ADMIN_EMAIL) {
-        return res.status(401).json({ message: 'Not authorized' });
-      }
-    }
-
-    await User.findByIdAndUpdate(req.params.id, { isVerified: true });
-    res.json({ message: 'Driver verified successfully' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
