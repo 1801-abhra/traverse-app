@@ -66,4 +66,11 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
+userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ role: 1 });
+userSchema.index({ isAvailable: 1, role: 1, vehicleType: 1 });
+userSchema.index({ fcmToken: 1 });
+userSchema.index({ isVerified: 1 });
+userSchema.index({ isBlocked: 1 });
+
 module.exports = mongoose.model('User', userSchema);

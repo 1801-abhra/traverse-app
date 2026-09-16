@@ -81,4 +81,15 @@ const rideSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+rideSchema.index({ student: 1 });
+rideSchema.index({ driver: 1 });
+rideSchema.index({ status: 1 });
+rideSchema.index({ status: 1, vehicleType: 1 });
+rideSchema.index({ status: 1, isScheduled: 1 });
+rideSchema.index({ rideType: 1, status: 1, isFull: 1 });
+rideSchema.index({ student: 1, status: 1 });
+rideSchema.index({ driver: 1, status: 1 });
+rideSchema.index({ createdAt: -1 });
+rideSchema.index({ scheduledTime: 1, isScheduled: 1 });
+
 module.exports = mongoose.model('Ride', rideSchema);
