@@ -38,6 +38,19 @@ router.post('/book', protect, async (req, res) => {
     }
 
     const { pickup, dropoff, fare, scheduledTime, vehicleType } = req.body;
+    if (scheduledTime) {
+      const scheduled = new Date(scheduledTime);
+      const now = new Date();
+      const hoursDiff = (scheduled - now) / (1000 * 60 * 60);
+      
+      if (hoursDiff < 0) {
+        return res.status(400).json({ message: 'Scheduled time cannot be in the past' });
+      }
+      if (hoursDiff > 48) {
+        return res.status(400).json({ message: 'Scheduled rides can only be booked up to 48 hours in advance' });
+      }
+    }
+
     const ride = await Ride.create({
       student: req.user._id,
       pickup,
@@ -547,6 +560,19 @@ router.post('/book-shared', protect, async (req, res) => {
     }
 
     const { pickup, dropoff, fare, vehicleType, scheduledTime } = req.body;
+    if (scheduledTime) {
+      const scheduled = new Date(scheduledTime);
+      const now = new Date();
+      const hoursDiff = (scheduled - now) / (1000 * 60 * 60);
+      
+      if (hoursDiff < 0) {
+        return res.status(400).json({ message: 'Scheduled time cannot be in the past' });
+      }
+      if (hoursDiff > 48) {
+        return res.status(400).json({ message: 'Scheduled rides can only be booked up to 48 hours in advance' });
+      }
+    }
+
 
     // Set max passengers based on vehicle type
     const maxPassengers = vehicleType === '6+1' ? 6 : 4;
@@ -897,6 +923,50 @@ router.put('/cancel-accepted/:id', protect, async (req, res) => {
   }
 });
 // Pre-accept scheduled ride (driver)
+// Driver starts a pre-accepted scheduled ride now
+router.put('/start-scheduled/:id', protect, async (req, res) => {
+  try {
+    const ride = await Ride.findById(req.params.id)
+      .populate('student', 'name phone email studentId role')
+      .populate('driver', 'name vehicleNumber phone carName carModel');
+    
+    if (!ride) return res.status(404).json({ message: 'Ride not found' });
+    const driverId = ride.driver?._id || ride.driver;
+    if (!driverId || driverId.toString() !== req.user._id.toString()) {
+      return res.status(401).json({ message: 'Not authorized' });
+    }
+    
+    // Convert scheduled ride to active ride
+    ride.status = 'accepted';
+    ride.isScheduled = false;
+    await ride.save();
+
+    const populated = await Ride.findById(ride._id)
+      .populate('driver', 'name vehicleNumber phone carName carModel')
+      .populate('student', 'name email studentId phone role')
+      .populate('passengers.student', 'name phone');
+
+    // Notify student - ride is now active
+    req.io.to(ride.student._id.toString()).emit('ride:accepted', populated);
+    
+    // Send push to student
+    const student = await User.findById(ride.student._id);
+    if (student?.fcmToken) {
+      await sendPushNotification(
+        req.admin,
+        student.fcmToken,
+        '🚗 Driver Started Your Ride!',
+        `${req.user.name} has started your scheduled ride and is on the way!`
+      );
+    }
+
+    res.json(populated);
+  } catch (error) {
+    console.error('Start scheduled error:', error.message);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 router.put('/pre-accept/:id', protect, async (req, res) => {
   try {
     const ride = await Ride.findById(req.params.id);
