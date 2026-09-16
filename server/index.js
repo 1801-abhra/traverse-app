@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
 const admin = require('firebase-admin');
+const rateLimit = require('express-rate-limit');
 
 const authRoutes = require('./routes/auth');
 const rideRoutes = require('./routes/rides');
@@ -138,11 +139,57 @@ app.use((req, res, next) => {
   next();
 });
 
+// Trust proxy for Render deployment
+app.set('trust proxy', 1);
+
+// General API rate limit - 100 requests per 15 mins per IP
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { message: 'Too many requests, please try again after 15 minutes' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+// Strict login rate limit - 5 attempts per 15 mins per IP
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { message: 'Too many login attempts, please try again after 15 minutes' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+// Register rate limit - 3 registrations per hour per IP
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  message: { message: 'Too many registration attempts, please try again after an hour' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+// Apply general limiter to all API routes
+app.use('/api/', apiLimiter);
+
+// Apply strict limiter specifically to auth routes
+app.use('/api/auth/login', loginLimiter);
+app.use('/api/auth/register', registerLimiter);
+app.use('/api/auth/forgot-password', loginLimiter);
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/rides', rideRoutes);
 
 app.get('/', (req, res) => res.send('Traverse API running'));
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('Global error:', err.message);
+  res.status(err.status || 500).json({
+    message: err.message || 'Internal server error'
+  });
+});
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
