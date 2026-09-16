@@ -408,15 +408,18 @@ router.put('/cancel/:id', protect, async (req, res) => {
 // Ride history
 router.get('/history', protect, async (req, res) => {
   try {
-    const query = req.user.role === 'student'
-      ? { student: req.user._id }
-      : { driver: req.user._id };
+    const isDriver = req.user.role === 'driver';
+    const query = isDriver
+      ? { driver: req.user._id }
+      : { $or: [{ student: req.user._id }, { 'passengers.student': req.user._id }] };
     const rides = await Ride.find(query)
-      .populate('student', 'name')
-      .populate('driver', 'name vehicleNumber phone')
+      .populate('student', 'name phone')
+      .populate('driver', 'name vehicleNumber phone carName carModel vehicleType')
+      .populate('passengers.student', 'name phone')
       .sort({ createdAt: -1 });
     res.json(rides);
   } catch (error) {
+    console.error('History fetch error:', error.message);
     res.status(500).json({ message: error.message });
   }
 });

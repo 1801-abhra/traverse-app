@@ -142,28 +142,28 @@ app.use((req, res, next) => {
 // Trust proxy for Render deployment
 app.set('trust proxy', 1);
 
-// General API rate limit - 100 requests per 15 mins per IP
+// General API rate limit - generous limit for campus WiFi shared IPs (5000 req / 15 mins)
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 5000,
   message: { message: 'Too many requests, please try again after 15 minutes' },
   standardHeaders: true,
   legacyHeaders: false
 });
 
-// Strict login rate limit - 5 attempts per 15 mins per IP
+// Strict login rate limit - 15 attempts per 15 mins per IP
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 15,
   message: { message: 'Too many login attempts, please try again after 15 minutes' },
   standardHeaders: true,
   legacyHeaders: false
 });
 
-// Register rate limit - 3 registrations per hour per IP
+// Register rate limit - 10 registrations per hour per IP
 const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 3,
+  max: 10,
   message: { message: 'Too many registration attempts, please try again after an hour' },
   standardHeaders: true,
   legacyHeaders: false
