@@ -101,7 +101,9 @@ router.get('/available', protect, async (req, res) => {
       isScheduled: { $ne: true }
     })
       .populate('student', 'name email studentId phone role')
-      .populate('passengers.student', 'name phone');
+      .populate('passengers.student', 'name phone')
+      .sort({ createdAt: 1 })
+      .limit(5);
     res.json(rides);
   } catch (error) {
     console.log('Available rides error:', error.message);
@@ -142,12 +144,54 @@ router.get('/drivers-available', protect, async (req, res) => {
   try {
     const { vehicleType } = req.query;
     const normalizedType = vehicleType ? vehicleType.replace(/ /g, '+') : '4+1';
-    const availableDrivers = await User.find({
+    
+    // Dynamic real-time query of currently online & available drivers
+    const driverCount = await User.countDocuments({
       role: 'driver',
       isAvailable: true,
       vehicleType: normalizedType
     });
-    res.json({ available: availableDrivers.length > 0, count: availableDrivers.length });
+
+    if (driverCount === 0) {
+      return res.json({
+        available: false,
+        reason: 'no_drivers',
+        message: 'No drivers online right now. Please try again later.',
+        count: 0,
+        driverCount: 0,
+        capacity: 0,
+        currentLoad: 0
+      });
+    }
+
+    const capacity = driverCount * 3;
+    const currentLoad = await Ride.countDocuments({
+      vehicleType: normalizedType,
+      status: { $in: ['searching', 'accepted', 'ontheway'] },
+      isScheduled: { $ne: true }
+    });
+
+    if (currentLoad >= capacity) {
+      return res.json({
+        available: false,
+        reason: 'all_busy',
+        message: 'All drivers are busy right now. Please try again in a few minutes.',
+        count: driverCount,
+        driverCount,
+        capacity,
+        currentLoad
+      });
+    }
+
+    res.json({
+      available: true,
+      reason: 'available',
+      message: `${driverCount} driver${driverCount > 1 ? 's' : ''} available`,
+      count: driverCount,
+      driverCount,
+      capacity,
+      currentLoad
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
