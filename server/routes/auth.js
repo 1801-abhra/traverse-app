@@ -291,6 +291,38 @@ router.put('/admin/verify/:id', async (req, res) => {
   }
 });
 
+// Admin - toggle driver online/offline availability
+router.put('/admin/toggle-availability/:id', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ message: 'No token' });
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.id !== 'admin') {
+      const user = await User.findById(decoded.id);
+      if (!user || user.email !== process.env.ADMIN_EMAIL) {
+        return res.status(401).json({ message: 'Not authorized' });
+      }
+    }
+
+    const driver = await User.findById(req.params.id);
+    if (!driver) return res.status(404).json({ message: 'Driver not found' });
+    if (driver.role !== 'driver') return res.status(400).json({ message: 'User is not a driver' });
+
+    driver.isAvailable = !driver.isAvailable;
+    await driver.save();
+
+    res.json({
+      message: `Driver status changed to ${driver.isAvailable ? 'Online' : 'Offline'}`,
+      isAvailable: driver.isAvailable,
+      driver
+    });
+  } catch (error) {
+    console.log('Admin toggle availability error:', error.message);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // Get current user
 router.get('/me', protect, async (req, res) => {
   try {
