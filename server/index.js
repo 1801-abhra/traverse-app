@@ -3,33 +3,37 @@ const http = require('http');
 const socketio = require('socket.io');
 const mongoose = require('mongoose');
 const cors = require('cors');
+require('dotenv').config();
+const admin = require('firebase-admin');
+const rateLimit = require('express-rate-limit');
 
 const allowedOrigins = [
   'https://traverse-unicab.vercel.app',
   'https://traverse-unicab-backend-2df13b58c562.herokuapp.com',
   'http://localhost:3000'
 ];
-require('dotenv').config();
-const admin = require('firebase-admin');
-const rateLimit = require('express-rate-limit');
 
 const authRoutes = require('./routes/auth');
 const rideRoutes = require('./routes/rides');
 
 // Initialize Firebase Admin
 try {
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY
-    .replace(/\\n/g, '\n')
-    .replace(/"/g, '');
+  if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_PROJECT_ID) {
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY
+      .replace(/\\n/g, '\n')
+      .replace(/"/g, '');
 
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: privateKey
-    })
-  });
-  console.log('Firebase initialized successfully');
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: privateKey
+      })
+    });
+    console.log('Firebase initialized successfully');
+  } else {
+    console.warn('⚠️ Firebase credentials not found in env');
+  }
 } catch (error) {
   console.log('Firebase init error:', error.message);
 }
@@ -68,9 +72,39 @@ app.use((req, res, next) => {
 });
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB connected'))
-  .catch(err => console.log('MongoDB error:', err));
+if (!process.env.MONGO_URI) {
+  console.error('❌ CRITICAL: MONGO_URI is not defined in environment variables!');
+} else {
+  console.log('🔄 Connecting to MongoDB...');
+}
+
+mongoose.connect(process.env.MONGO_URI, {
+  serverSelectionTimeoutMS: 8000,
+  maxPoolSize: 10
+})
+  .then(() => console.log('✅ MongoDB connected successfully'))
+  .catch(err => {
+    console.error('❌ MongoDB initial connection error:', err.message);
+  });
+
+mongoose.connection.on('connected', () => console.log('✅ Mongoose connected to DB'));
+mongoose.connection.on('error', (err) => console.error('❌ Mongoose connection error:', err.message));
+mongoose.connection.on('disconnected', () => console.warn('⚠️ Mongoose connection disconnected'));
+
+// Health check endpoint for monitoring Heroku + DB status
+app.get('/api/health', (req, res) => {
+  const dbState = mongoose.connection.readyState;
+  const dbStatusMap = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+  const dbStatus = dbStatusMap[dbState] || 'unknown';
+  
+  res.status(dbState === 1 ? 200 : 503).json({
+    status: dbState === 1 ? 'healthy' : 'degraded',
+    uptime: Math.floor(process.uptime()),
+    database: dbStatus,
+    mongoConfigured: !!process.env.MONGO_URI,
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Socket.io
 io.on('connection', (socket) => {
@@ -145,7 +179,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Trust proxy for Render deployment
+// Trust proxy for Heroku / Cloud deployment
 app.set('trust proxy', 1);
 
 // General API rate limit - generous limit for campus WiFi shared IPs (5000 req / 15 mins)
