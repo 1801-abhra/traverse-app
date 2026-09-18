@@ -5,7 +5,7 @@ const client = new BrevoClient({
 });
 
 const sendVerificationEmail = async (email, name, token) => {
-    const verifyUrl = `https://traverse-app.onrender.com/api/auth/verify-email/${token}`;
+    const verifyUrl = `https://traverse-unicab-backend-2df13b58c562.herokuapp.com/api/auth/verify-email/${token}`;
     try {
         await client.transactionalEmails.sendTransacEmail({
             subject: '✅ Verify your Traverse-Unicab account',

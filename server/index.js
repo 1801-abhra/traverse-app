@@ -3,6 +3,12 @@ const http = require('http');
 const socketio = require('socket.io');
 const mongoose = require('mongoose');
 const cors = require('cors');
+
+const allowedOrigins = [
+  'https://traverse-unicab.vercel.app',
+  'https://traverse-unicab-backend-2df13b58c562.herokuapp.com',
+  'http://localhost:3000'
+];
 require('dotenv').config();
 const admin = require('firebase-admin');
 const rateLimit = require('express-rate-limit');
