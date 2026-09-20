@@ -135,6 +135,10 @@ router.put('/toggle-availability', protect, async (req, res) => {
     const driver = await User.findById(req.user._id);
     driver.isAvailable = !driver.isAvailable;
     await driver.save();
+    req.io.emit('driver:availability-changed', { 
+      vehicleType: driver.vehicleType,
+      isAvailable: driver.isAvailable 
+    });
     res.json({ isAvailable: driver.isAvailable });
   } catch (error) {
     res.status(500).json({ message: error.message });
