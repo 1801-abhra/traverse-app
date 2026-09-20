@@ -34,6 +34,19 @@ router.post('/book', protect, async (req, res) => {
     });
   }
   try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayRides = await Ride.countDocuments({
+      student: req.user._id,
+      createdAt: { $gte: today },
+      status: { $ne: 'cancelled' }
+    });
+    if (todayRides >= 10) {
+      return res.status(429).json({ 
+        message: 'Daily booking limit reached. Maximum 10 rides per day allowed.' 
+      });
+    }
+
     const existingRide = await Ride.findOne({
       student: req.user._id,
       status: { $in: ['searching', 'accepted', 'ontheway'] }
@@ -605,6 +618,19 @@ router.post('/book-shared', protect, async (req, res) => {
     });
   }
   try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayRides = await Ride.countDocuments({
+      student: req.user._id,
+      createdAt: { $gte: today },
+      status: { $ne: 'cancelled' }
+    });
+    if (todayRides >= 10) {
+      return res.status(429).json({ 
+        message: 'Daily booking limit reached. Maximum 10 rides per day allowed.' 
+      });
+    }
+
     const activeRide = await Ride.findOne({
       student: req.user._id,
       status: { $in: ['searching', 'accepted', 'ontheway'] }
