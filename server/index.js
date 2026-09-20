@@ -7,8 +7,6 @@ require('dotenv').config();
 const admin = require('firebase-admin');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
-const mongoSanitize = require('express-mongo-sanitize');
-const xss = require('xss');
 
 const allowedOrigins = [
   'https://traverse-unicab.vercel.app',
@@ -67,20 +65,29 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'x-session-token']
 }));
 app.use(express.json());
-app.use(mongoSanitize());
 
 app.use((req, res, next) => {
   if (req.body) {
-    const sanitize = (obj) => {
-      if (typeof obj === 'string') return xss(obj);
-      if (typeof obj === 'object' && obj !== null) {
-        Object.keys(obj).forEach(key => {
-          obj[key] = sanitize(obj[key]);
-        });
+    const sanitizeValue = (val) => {
+      if (typeof val === 'string') {
+        return val
+          .replace(/\$/g, '')
+          .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+          .replace(/javascript:/gi, '')
+          .replace(/on\w+\s*=/gi, '');
       }
-      return obj;
+      if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
+        const clean = {};
+        Object.keys(val).forEach(key => {
+          if (!key.startsWith('$')) {
+            clean[key] = sanitizeValue(val[key]);
+          }
+        });
+        return clean;
+      }
+      return val;
     };
-    req.body = sanitize(req.body);
+    req.body = sanitizeValue(req.body);
   }
   next();
 });
