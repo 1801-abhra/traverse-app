@@ -67,6 +67,15 @@ app.use(cors({
 app.use(express.json());
 
 app.use((req, res, next) => {
+  res.setTimeout(30000, () => {
+    res.status(408).json({ 
+      message: 'Request timeout. Please try again.' 
+    });
+  });
+  next();
+});
+
+app.use((req, res, next) => {
   if (req.body) {
     const sanitizeValue = (val) => {
       if (typeof val === 'string') {
