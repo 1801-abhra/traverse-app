@@ -7,6 +7,8 @@ require('dotenv').config();
 const admin = require('firebase-admin');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
+const xss = require('xss-clean');
 
 const allowedOrigins = [
   'https://traverse-unicab.vercel.app',
@@ -65,6 +67,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'x-session-token']
 }));
 app.use(express.json());
+app.use(mongoSanitize());
+app.use(xss());
 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
