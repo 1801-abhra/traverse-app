@@ -6,6 +6,7 @@ const cors = require('cors');
 require('dotenv').config();
 const admin = require('firebase-admin');
 const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 
 const allowedOrigins = [
   'https://traverse-unicab.vercel.app',
@@ -39,6 +40,10 @@ try {
 }
 
 const app = express();
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
+}));
 const server = http.createServer(app);
 
 const io = socketio(server, {
