@@ -28,6 +28,11 @@ const sendPushNotification = async (admin, fcmToken, title, body) => {
 };
 // Book a ride (student)
 router.post('/book', protect, async (req, res) => {
+  if (req.user.role === 'driver') {
+    return res.status(403).json({ 
+      message: 'Drivers cannot book rides.' 
+    });
+  }
   try {
     const existingRide = await Ride.findOne({
       student: req.user._id,
@@ -594,6 +599,11 @@ router.put('/admin/cancel/:id', async (req, res) => {
 });
 // Book shared ride
 router.post('/book-shared', protect, async (req, res) => {
+  if (req.user.role === 'driver') {
+    return res.status(403).json({ 
+      message: 'Drivers cannot book rides.' 
+    });
+  }
   try {
     const activeRide = await Ride.findOne({
       student: req.user._id,
