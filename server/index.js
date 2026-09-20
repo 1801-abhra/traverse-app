@@ -8,7 +8,7 @@ const admin = require('firebase-admin');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const mongoSanitize = require('express-mongo-sanitize');
-const xss = require('xss-clean');
+const xss = require('xss');
 
 const allowedOrigins = [
   'https://traverse-unicab.vercel.app',
@@ -68,7 +68,22 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(mongoSanitize());
-app.use(xss());
+
+app.use((req, res, next) => {
+  if (req.body) {
+    const sanitize = (obj) => {
+      if (typeof obj === 'string') return xss(obj);
+      if (typeof obj === 'object' && obj !== null) {
+        Object.keys(obj).forEach(key => {
+          obj[key] = sanitize(obj[key]);
+        });
+      }
+      return obj;
+    };
+    req.body = sanitize(req.body);
+  }
+  next();
+});
 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
