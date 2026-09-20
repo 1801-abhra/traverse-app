@@ -116,7 +116,8 @@ router.get('/available', protect, async (req, res) => {
       status: 'searching',
       driver: null,
       vehicleType: driver.vehicleType,
-      isScheduled: { $ne: true }
+      isScheduled: { $ne: true },
+      rejectedBy: { $nin: [req.user._id] }
     })
       .populate('student', 'name email studentId phone role')
       .populate('passengers.student', 'name phone')
@@ -298,6 +299,10 @@ router.put('/reject/:id', protect, async (req, res) => {
     if (!ride) return res.status(404).json({ message: 'Ride not found' });
     ride.status = 'searching';
     ride.driver = null;
+    if (!ride.rejectedBy) ride.rejectedBy = [];
+    if (!ride.rejectedBy.some(id => id.toString() === req.user._id.toString())) {
+      ride.rejectedBy.push(req.user._id);
+    }
     await ride.save();
     res.json({ message: 'Ride rejected' });
   } catch (error) {

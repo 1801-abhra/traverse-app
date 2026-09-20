@@ -78,7 +78,11 @@ const rideSchema = new mongoose.Schema({
     min: 1,
     max: 5,
     default: null
-  }
+  },
+  rejectedBy: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }]
 }, { timestamps: true });
 
 rideSchema.index({ student: 1 });
@@ -91,5 +95,6 @@ rideSchema.index({ student: 1, status: 1 });
 rideSchema.index({ driver: 1, status: 1 });
 rideSchema.index({ createdAt: -1 });
 rideSchema.index({ scheduledTime: 1, isScheduled: 1 });
+rideSchema.index({ rejectedBy: 1 });
 
 module.exports = mongoose.model('Ride', rideSchema);
