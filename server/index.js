@@ -1,9 +1,38 @@
+const Sentry = require('@sentry/node');
+require('dotenv').config();
+
+// Initialize Sentry error monitoring
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || 'production',
+    tracesSampleRate: 1.0
+  });
+  console.log('✅ Sentry error monitoring initialized');
+} else {
+  console.log('ℹ️ Sentry DSN not configured in environment');
+}
+
+// Global unhandled error handlers
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  if (process.env.SENTRY_DSN) {
+    Sentry.captureException(reason);
+  }
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  if (process.env.SENTRY_DSN) {
+    Sentry.captureException(err);
+  }
+});
+
 const express = require('express');
 const http = require('http');
 const socketio = require('socket.io');
 const mongoose = require('mongoose');
 const cors = require('cors');
-require('dotenv').config();
 const admin = require('firebase-admin');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
@@ -40,6 +69,12 @@ try {
 }
 
 const app = express();
+
+// Sentry request handler middleware
+if (typeof Sentry.Handlers?.requestHandler === 'function') {
+  app.use(Sentry.Handlers.requestHandler());
+}
+
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
@@ -54,6 +89,11 @@ const io = socketio(server, {
     },
     methods: ['GET', 'POST']
   }
+});
+
+io.engine.on('connection_error', (err) => {
+  console.error('Socket.io engine connection error:', err);
+  if (process.env.SENTRY_DSN) Sentry.captureException(err);
 });
 
 app.use(cors({
@@ -126,10 +166,14 @@ mongoose.connect(process.env.MONGO_URI, {
   .then(() => console.log('✅ MongoDB connected successfully'))
   .catch(err => {
     console.error('❌ MongoDB initial connection error:', err.message);
+    if (process.env.SENTRY_DSN) Sentry.captureException(err);
   });
 
 mongoose.connection.on('connected', () => console.log('✅ Mongoose connected to DB'));
-mongoose.connection.on('error', (err) => console.error('❌ Mongoose connection error:', err.message));
+mongoose.connection.on('error', (err) => {
+  console.error('❌ Mongoose connection error:', err.message);
+  if (process.env.SENTRY_DSN) Sentry.captureException(err);
+});
 mongoose.connection.on('disconnected', () => console.warn('⚠️ Mongoose connection disconnected'));
 
 // Health check endpoint for monitoring Heroku + DB status
@@ -150,6 +194,11 @@ app.get('/api/health', (req, res) => {
 // Socket.io
 io.on('connection', (socket) => {
   console.log('Socket connected:', socket.id);
+
+  socket.on('error', (err) => {
+    console.error('Socket error:', err);
+    if (process.env.SENTRY_DSN) Sentry.captureException(err);
+  });
 
   socket.on('join', ({ userId, role, vehicleType }) => {
     if (userId) {
@@ -264,9 +313,19 @@ app.use('/api/rides', rideRoutes);
 
 app.get('/', (req, res) => res.send('Traverse API running'));
 
+// Sentry error handler middleware
+if (typeof Sentry.setupExpressErrorHandler === 'function') {
+  Sentry.setupExpressErrorHandler(app);
+} else if (typeof Sentry.Handlers?.errorHandler === 'function') {
+  app.use(Sentry.Handlers.errorHandler());
+}
+
 // Global error handler
 app.use((err, req, res, next) => {
   console.error('Global error:', err.message);
+  if (process.env.SENTRY_DSN) {
+    Sentry.captureException(err);
+  }
   res.status(err.status || 500).json({
     message: err.message || 'Internal server error'
   });
