@@ -311,10 +311,6 @@ app.use('/api/auth/forgot-password', loginLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/rides', rideRoutes);
 
-app.get('/debug-sentry', (req, res) => {
-  throw new Error('Sentry test error from Traverse!');
-});
-
 app.get('/', (req, res) => res.send('Traverse API running'));
 
 // Sentry error handler middleware
