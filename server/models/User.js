@@ -30,6 +30,14 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  rating: {
+    type: Number,
+    default: 5.0
+  },
+  totalRatings: {
+    type: Number,
+    default: 0
+  },
   verificationToken: {
     type: String,
     default: null

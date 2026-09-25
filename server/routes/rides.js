@@ -154,7 +154,7 @@ router.get('/driver-active', protect, async (req, res) => {
       status: { $in: ['accepted', 'ontheway'] }
     })
       .populate('student', 'name email studentId phone')
-      .populate('driver', 'name vehicleNumber phone isVerified')
+      .populate('driver', 'name vehicleNumber phone isVerified rating totalRatings')
       .populate('passengers.student', 'name phone');
     res.json(ride || null);
   } catch (error) {
@@ -240,7 +240,7 @@ router.put('/accept/:id', protect, async (req, res) => {
     await ride.save();
 
     const populated = await Ride.findById(ride._id)
-      .populate('driver', 'name vehicleNumber phone carName carModel isVerified')
+      .populate('driver', 'name vehicleNumber phone carName carModel isVerified rating totalRatings')
       .populate('student', 'name email studentId phone')
       .populate('passengers.student', 'name phone');
 
@@ -327,7 +327,7 @@ router.put('/status/:id', protect, async (req, res) => {
     await ride.save();
 
     const populated = await Ride.findById(ride._id)
-      .populate('driver', 'name vehicleNumber phone carName carModel isVerified')
+      .populate('driver', 'name vehicleNumber phone carName carModel isVerified rating totalRatings')
       .populate('student', 'name email studentId phone')
       .populate('passengers.student', 'name phone');
 
@@ -504,7 +504,7 @@ router.get('/history', protect, async (req, res) => {
       : { $or: [{ student: req.user._id }, { 'passengers.student': req.user._id }] };
     const rides = await Ride.find(query)
       .populate('student', 'name phone')
-      .populate('driver', 'name vehicleNumber phone carName carModel vehicleType isVerified')
+      .populate('driver', 'name vehicleNumber phone carName carModel vehicleType isVerified rating totalRatings')
       .populate('passengers.student', 'name phone')
       .sort({ createdAt: -1 });
     res.json(rides);
@@ -524,6 +524,21 @@ router.put('/rate/:id', protect, async (req, res) => {
     }
     ride.rating = rating;
     await ride.save();
+
+    // Update driver's average rating on User model
+    if (ride.driver) {
+      try {
+        const ratedRides = await Ride.find({ driver: ride.driver, rating: { $ne: null } });
+        if (ratedRides.length > 0) {
+          const sum = ratedRides.reduce((acc, r) => acc + (Number(r.rating) || 0), 0);
+          const avg = Number((sum / ratedRides.length).toFixed(1));
+          await User.findByIdAndUpdate(ride.driver, { rating: avg, totalRatings: ratedRides.length });
+        }
+      } catch (err) {
+        console.error('Failed to update driver user rating:', err.message);
+      }
+    }
+
     res.json(ride);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -590,7 +605,7 @@ router.get('/admin/rides', async (req, res) => {
     const total = await Ride.countDocuments(filter);
     const rides = await Ride.find(filter)
       .populate('student', 'name email studentId phone role')
-      .populate('driver', 'name email vehicleNumber phone carName carModel vehicleType isVerified')
+      .populate('driver', 'name email vehicleNumber phone carName carModel vehicleType isVerified rating totalRatings')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
@@ -942,7 +957,7 @@ router.get('/active', protect, async (req, res) => {
       ],
       status: { $in: ['searching', 'accepted', 'ontheway'] }
     })
-      .populate('driver', 'name vehicleNumber phone carName carModel isVerified')
+      .populate('driver', 'name vehicleNumber phone carName carModel isVerified rating totalRatings')
       .populate('student', 'name email studentId phone')
       .populate('passengers.student', 'name phone');
     res.json(ride || null);
@@ -1017,7 +1032,7 @@ router.put('/start-scheduled/:id', protect, async (req, res) => {
   try {
     const ride = await Ride.findById(req.params.id)
       .populate('student', 'name phone email studentId role')
-      .populate('driver', 'name vehicleNumber phone carName carModel isVerified');
+      .populate('driver', 'name vehicleNumber phone carName carModel isVerified rating totalRatings');
     
     if (!ride) return res.status(404).json({ message: 'Ride not found' });
     const driverId = ride.driver?._id || ride.driver;
@@ -1031,7 +1046,7 @@ router.put('/start-scheduled/:id', protect, async (req, res) => {
     await ride.save();
 
     const populated = await Ride.findById(ride._id)
-      .populate('driver', 'name vehicleNumber phone carName carModel isVerified')
+      .populate('driver', 'name vehicleNumber phone carName carModel isVerified rating totalRatings')
       .populate('student', 'name email studentId phone role')
       .populate('passengers.student', 'name phone');
 
@@ -1066,7 +1081,7 @@ router.put('/pre-accept/:id', protect, async (req, res) => {
     ride.driver = req.user._id;
     await ride.save();
     const populated = await Ride.findById(ride._id)
-      .populate('driver', 'name vehicleNumber phone carName carModel isVerified')
+      .populate('driver', 'name vehicleNumber phone carName carModel isVerified rating totalRatings')
       .populate('student', 'name email studentId phone role')
       .populate('passengers.student', 'name phone studentId role');
     // Notify student
