@@ -75,6 +75,14 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // Check if account is locked
+    if (user.lockUntil && user.lockUntil > Date.now()) {
+      const minutesLeft = Math.ceil((user.lockUntil - Date.now()) / 60000);
+      return res.status(423).json({ 
+        message: `Account locked due to too many failed attempts. Try again in ${minutesLeft} minutes.` 
+      });
+    }
+
     // Check if email is verified
     if (!user.isVerified && user.role !== 'driver') {
       return res.status(401).json({
@@ -90,9 +98,24 @@ router.post('/login', async (req, res) => {
     }
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      user.loginAttempts = (user.loginAttempts || 0) + 1;
+      if (user.loginAttempts >= 5) {
+        user.lockUntil = new Date(Date.now() + 30 * 60 * 1000); // Lock 30 mins
+        user.loginAttempts = 0; // Reset counter
+        await user.save();
+        return res.status(423).json({ 
+          message: 'Account locked for 30 minutes due to too many failed attempts.' 
+        });
+      }
+      await user.save();
+      return res.status(401).json({ 
+        message: `Invalid credentials. ${5 - user.loginAttempts} attempts remaining before lockout.` 
+      });
     }
 
+    // Reset login attempts on successful login
+    user.loginAttempts = 0;
+    user.lockUntil = null;
 
     // Generate unique session token
     const sessionToken = crypto.randomBytes(32).toString('hex');
