@@ -1,7 +1,7 @@
 const express = require('express');
 const Ride = require('../models/Ride');
 const User = require('../models/User');
-const { protect } = require('../middleware/auth');
+const { protect, adminOnly } = require('../middleware/auth');
 const router = express.Router();
 const sendPushNotification = async (admin, fcmToken, title, body) => {
   if (!fcmToken) return;
@@ -563,7 +563,7 @@ router.get('/my-rating', protect, async (req, res) => {
   }
 });
 // Admin - get paginated rides with robust search and status filter
-router.get('/admin/rides', async (req, res) => {
+router.get('/admin/rides', adminOnly, async (req, res) => {
   try {
     const { search = '', page = 1, limit = 15, status } = req.query;
     const pageNum = Math.max(1, parseInt(page) || 1);
@@ -623,7 +623,7 @@ router.get('/admin/rides', async (req, res) => {
   }
 });
 
-router.put('/admin/cancel/:id', async (req, res) => {
+router.put('/admin/cancel/:id', adminOnly, async (req, res) => {
   try {
     const ride = await Ride.findById(req.params.id);
     if (!ride) return res.status(404).json({ message: 'Ride not found' });

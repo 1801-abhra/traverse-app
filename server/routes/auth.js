@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Ride = require('../models/Ride');
 const router = express.Router();
-const { protect } = require('../middleware/auth');
+const { protect, adminOnly } = require('../middleware/auth');
 const crypto = require('crypto');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/email');
 const generateToken = (id) => {
@@ -138,7 +138,7 @@ router.post('/login', async (req, res) => {
   }
 });
 // Admin - get platform overview statistics
-router.get('/admin/stats', async (req, res) => {
+router.get('/admin/stats', adminOnly, async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader) return res.status(401).json({ message: 'No token' });
@@ -199,7 +199,7 @@ router.get('/admin/stats', async (req, res) => {
 });
 
 // Admin - get paginated users with robust search and role/status filtering
-router.get('/admin/users', async (req, res) => {
+router.get('/admin/users', adminOnly, async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader) return res.status(401).json({ message: 'No token' });
@@ -268,7 +268,7 @@ router.get('/admin/users', async (req, res) => {
 });
 
 // Admin - block/unblock user
-router.put('/admin/block/:id', async (req, res) => {
+router.put('/admin/block/:id', adminOnly, async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader) return res.status(401).json({ message: 'No token' });
@@ -292,7 +292,7 @@ router.put('/admin/block/:id', async (req, res) => {
 });
 
 // Admin - verify driver
-router.put('/admin/verify/:id', async (req, res) => {
+router.put('/admin/verify/:id', adminOnly, async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader) return res.status(401).json({ message: 'No token' });
@@ -315,7 +315,7 @@ router.put('/admin/verify/:id', async (req, res) => {
 });
 
 // Admin - toggle driver online/offline availability
-router.put('/admin/toggle-availability/:id', async (req, res) => {
+router.put('/admin/toggle-availability/:id', adminOnly, async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader) return res.status(401).json({ message: 'No token' });
