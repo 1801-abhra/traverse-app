@@ -1,7 +1,7 @@
 const express = require('express');
 const Ride = require('../models/Ride');
 const User = require('../models/User');
-const { protect, adminOnly } = require('../middleware/auth');
+const { protect } = require('../middleware/auth');
 const router = express.Router();
 const sendPushNotification = async (admin, fcmToken, title, body) => {
   if (!fcmToken) return;
@@ -29,8 +29,8 @@ const sendPushNotification = async (admin, fcmToken, title, body) => {
 // Book a ride (student)
 router.post('/book', protect, async (req, res) => {
   if (req.user.role === 'driver') {
-    return res.status(403).json({ 
-      message: 'Drivers cannot book rides.' 
+    return res.status(403).json({
+      message: 'Drivers cannot book rides.'
     });
   }
   try {
@@ -42,8 +42,8 @@ router.post('/book', protect, async (req, res) => {
       status: { $ne: 'cancelled' }
     });
     if (todayRides >= 10) {
-      return res.status(429).json({ 
-        message: 'Daily booking limit reached. Maximum 10 rides per day allowed.' 
+      return res.status(429).json({
+        message: 'Daily booking limit reached. Maximum 10 rides per day allowed.'
       });
     }
 
@@ -60,7 +60,7 @@ router.post('/book', protect, async (req, res) => {
       const scheduled = new Date(scheduledTime);
       const now = new Date();
       const hoursDiff = (scheduled - now) / (1000 * 60 * 60);
-      
+
       if (hoursDiff < 0) {
         return res.status(400).json({ message: 'Scheduled time cannot be in the past' });
       }
@@ -135,9 +135,9 @@ router.put('/toggle-availability', protect, async (req, res) => {
     const driver = await User.findById(req.user._id);
     driver.isAvailable = !driver.isAvailable;
     await driver.save();
-    req.io.emit('driver:availability-changed', { 
+    req.io.emit('driver:availability-changed', {
       vehicleType: driver.vehicleType,
-      isAvailable: driver.isAvailable 
+      isAvailable: driver.isAvailable
     });
     res.json({ isAvailable: driver.isAvailable });
   } catch (error) {
@@ -151,11 +151,10 @@ router.get('/driver-active', protect, async (req, res) => {
     res.set('Cache-Control', 'no-store');
     const ride = await Ride.findOne({
       driver: req.user._id,
-      status: { $in: ['accepted', 'ontheway'] },
-      isScheduled: { $ne: true }
+      status: { $in: ['accepted', 'ontheway'] }
     })
       .populate('student', 'name email studentId phone')
-      .populate('driver', 'name vehicleNumber phone isVerified rating totalRatings')
+      .populate('driver', 'name vehicleNumber phone isVerified')
       .populate('passengers.student', 'name phone');
     res.json(ride || null);
   } catch (error) {
@@ -168,7 +167,7 @@ router.get('/drivers-available', protect, async (req, res) => {
   try {
     const { vehicleType } = req.query;
     const normalizedType = vehicleType ? vehicleType.replace(/ /g, '+') : '4+1';
-    
+
     // Dynamic real-time query of currently online & available drivers
     const driverCount = await User.countDocuments({
       role: 'driver',
@@ -241,7 +240,7 @@ router.put('/accept/:id', protect, async (req, res) => {
     await ride.save();
 
     const populated = await Ride.findById(ride._id)
-      .populate('driver', 'name vehicleNumber phone carName carModel isVerified rating totalRatings')
+      .populate('driver', 'name vehicleNumber phone carName carModel isVerified')
       .populate('student', 'name email studentId phone')
       .populate('passengers.student', 'name phone');
 
@@ -249,7 +248,7 @@ router.put('/accept/:id', protect, async (req, res) => {
     req.io.to(ride.student.toString()).emit('ride:accepted', populated);
 
     // Remove accepted ride from other drivers' searching lists
-    req.io.emit('ride:accepted-by-driver', { 
+    req.io.emit('ride:accepted-by-driver', {
       rideId: ride._id.toString(),
       driverId: req.user._id.toString()
     });
@@ -328,7 +327,7 @@ router.put('/status/:id', protect, async (req, res) => {
     await ride.save();
 
     const populated = await Ride.findById(ride._id)
-      .populate('driver', 'name vehicleNumber phone carName carModel isVerified rating totalRatings')
+      .populate('driver', 'name vehicleNumber phone carName carModel isVerified')
       .populate('student', 'name email studentId phone')
       .populate('passengers.student', 'name phone');
 
@@ -505,7 +504,7 @@ router.get('/history', protect, async (req, res) => {
       : { $or: [{ student: req.user._id }, { 'passengers.student': req.user._id }] };
     const rides = await Ride.find(query)
       .populate('student', 'name phone')
-      .populate('driver', 'name vehicleNumber phone carName carModel vehicleType isVerified rating totalRatings')
+      .populate('driver', 'name vehicleNumber phone carName carModel vehicleType isVerified')
       .populate('passengers.student', 'name phone')
       .sort({ createdAt: -1 });
     res.json(rides);
@@ -525,21 +524,6 @@ router.put('/rate/:id', protect, async (req, res) => {
     }
     ride.rating = rating;
     await ride.save();
-
-    // Update driver's average rating on User model
-    if (ride.driver) {
-      try {
-        const ratedRides = await Ride.find({ driver: ride.driver, rating: { $ne: null } });
-        if (ratedRides.length > 0) {
-          const sum = ratedRides.reduce((acc, r) => acc + (Number(r.rating) || 0), 0);
-          const avg = Number((sum / ratedRides.length).toFixed(1));
-          await User.findByIdAndUpdate(ride.driver, { rating: avg, totalRatings: ratedRides.length });
-        }
-      } catch (err) {
-        console.error('Failed to update driver user rating:', err.message);
-      }
-    }
-
     res.json(ride);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -564,7 +548,7 @@ router.get('/my-rating', protect, async (req, res) => {
   }
 });
 // Admin - get paginated rides with robust search and status filter
-router.get('/admin/rides', adminOnly, async (req, res) => {
+router.get('/admin/rides', async (req, res) => {
   try {
     const { search = '', page = 1, limit = 15, status } = req.query;
     const pageNum = Math.max(1, parseInt(page) || 1);
@@ -606,7 +590,7 @@ router.get('/admin/rides', adminOnly, async (req, res) => {
     const total = await Ride.countDocuments(filter);
     const rides = await Ride.find(filter)
       .populate('student', 'name email studentId phone role')
-      .populate('driver', 'name email vehicleNumber phone carName carModel vehicleType isVerified rating totalRatings')
+      .populate('driver', 'name email vehicleNumber phone carName carModel vehicleType isVerified')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
@@ -624,7 +608,7 @@ router.get('/admin/rides', adminOnly, async (req, res) => {
   }
 });
 
-router.put('/admin/cancel/:id', adminOnly, async (req, res) => {
+router.put('/admin/cancel/:id', async (req, res) => {
   try {
     const ride = await Ride.findById(req.params.id);
     if (!ride) return res.status(404).json({ message: 'Ride not found' });
@@ -638,8 +622,8 @@ router.put('/admin/cancel/:id', adminOnly, async (req, res) => {
 // Book shared ride
 router.post('/book-shared', protect, async (req, res) => {
   if (req.user.role === 'driver') {
-    return res.status(403).json({ 
-      message: 'Drivers cannot book rides.' 
+    return res.status(403).json({
+      message: 'Drivers cannot book rides.'
     });
   }
   try {
@@ -651,8 +635,8 @@ router.post('/book-shared', protect, async (req, res) => {
       status: { $ne: 'cancelled' }
     });
     if (todayRides >= 10) {
-      return res.status(429).json({ 
-        message: 'Daily booking limit reached. Maximum 10 rides per day allowed.' 
+      return res.status(429).json({
+        message: 'Daily booking limit reached. Maximum 10 rides per day allowed.'
       });
     }
 
@@ -669,7 +653,7 @@ router.post('/book-shared', protect, async (req, res) => {
       const scheduled = new Date(scheduledTime);
       const now = new Date();
       const hoursDiff = (scheduled - now) / (1000 * 60 * 60);
-      
+
       if (hoursDiff < 0) {
         return res.status(400).json({ message: 'Scheduled time cannot be in the past' });
       }
@@ -958,7 +942,7 @@ router.get('/active', protect, async (req, res) => {
       ],
       status: { $in: ['searching', 'accepted', 'ontheway'] }
     })
-      .populate('driver', 'name vehicleNumber phone carName carModel isVerified rating totalRatings')
+      .populate('driver', 'name vehicleNumber phone carName carModel isVerified')
       .populate('student', 'name email studentId phone')
       .populate('passengers.student', 'name phone');
     res.json(ride || null);
@@ -971,7 +955,7 @@ router.put('/cancel-accepted/:id', protect, async (req, res) => {
   try {
     const ride = await Ride.findById(req.params.id);
     if (!ride) return res.status(404).json({ message: 'Ride not found' });
-    if (ride.status !== 'accepted' && !(ride.isScheduled && ride.driver)) {
+    if (ride.status !== 'accepted') {
       return res.status(400).json({ message: 'Can only cancel accepted rides' });
     }
 
@@ -987,6 +971,7 @@ router.put('/cancel-accepted/:id', protect, async (req, res) => {
       console.log(`User ${req.user._id} has reached 5 cancellations - admin review needed`);
     }
 
+
     // Cancel the ride completely
     ride.status = 'cancelled';
     ride.driver = null;
@@ -997,15 +982,15 @@ router.put('/cancel-accepted/:id', protect, async (req, res) => {
       message: 'Ride cancelled successfully.'
     });
 
-    // Notify driver - ride was cancelled
+    // Notify driver - ride was cancelled by student
     if (driverId) {
       req.io.to(driverId.toString()).emit('ride:cancelled-by-party', {
-        message: 'Ride cancelled.'
+        message: 'Student cancelled the ride.'
       });
     }
 
-    // Push notification to opposite party
-    if (driverId && req.user._id.toString() === studentId.toString()) {
+    // Send push to driver
+    if (driverId) {
       const driver = await User.findById(driverId);
       if (driver?.fcmToken) {
         await sendPushNotification(
@@ -1013,16 +998,6 @@ router.put('/cancel-accepted/:id', protect, async (req, res) => {
           driver.fcmToken,
           '❌ Ride Cancelled',
           'The student has cancelled the ride.'
-        );
-      }
-    } else if (studentId && driverId && req.user._id.toString() === driverId.toString()) {
-      const student = await User.findById(studentId);
-      if (student?.fcmToken) {
-        await sendPushNotification(
-          req.admin,
-          student.fcmToken,
-          '❌ Ride Cancelled',
-          'The driver has cancelled the scheduled ride.'
         );
       }
     }
@@ -1042,27 +1017,27 @@ router.put('/start-scheduled/:id', protect, async (req, res) => {
   try {
     const ride = await Ride.findById(req.params.id)
       .populate('student', 'name phone email studentId role')
-      .populate('driver', 'name vehicleNumber phone carName carModel isVerified rating totalRatings');
-    
+      .populate('driver', 'name vehicleNumber phone carName carModel isVerified');
+
     if (!ride) return res.status(404).json({ message: 'Ride not found' });
     const driverId = ride.driver?._id || ride.driver;
     if (!driverId || driverId.toString() !== req.user._id.toString()) {
       return res.status(401).json({ message: 'Not authorized' });
     }
-    
+
     // Convert scheduled ride to active ride
     ride.status = 'accepted';
     ride.isScheduled = false;
     await ride.save();
 
     const populated = await Ride.findById(ride._id)
-      .populate('driver', 'name vehicleNumber phone carName carModel isVerified rating totalRatings')
+      .populate('driver', 'name vehicleNumber phone carName carModel isVerified')
       .populate('student', 'name email studentId phone role')
       .populate('passengers.student', 'name phone');
 
     // Notify student - ride is now active
     req.io.to(ride.student._id.toString()).emit('ride:accepted', populated);
-    
+
     // Send push to student
     const student = await User.findById(ride.student._id);
     if (student?.fcmToken) {
@@ -1089,16 +1064,12 @@ router.put('/pre-accept/:id', protect, async (req, res) => {
     if (ride.driver) return res.status(400).json({ message: 'Ride already pre-accepted by another driver' });
 
     ride.driver = req.user._id;
-    ride.status = 'accepted';
     await ride.save();
-
     const populated = await Ride.findById(ride._id)
-      .populate('driver', 'name vehicleNumber phone carName carModel isVerified rating totalRatings')
+      .populate('driver', 'name vehicleNumber phone carName carModel isVerified')
       .populate('student', 'name email studentId phone role')
       .populate('passengers.student', 'name phone studentId role');
-
     // Notify student
-    req.io.to(ride.student.toString()).emit('ride:accepted', populated);
     req.io.to(ride.student.toString()).emit('ride:pre-accepted', {
       message: `Driver ${req.user.name} will pick you up at scheduled time!`,
       ride: populated
@@ -1114,7 +1085,7 @@ router.put('/pre-accept/:id', protect, async (req, res) => {
         req.admin,
         student.fcmToken,
         '✅ Scheduled Ride Confirmed!',
-        `Your scheduled ride has been confirmed! ${req.user.name} will pick you up at scheduled time.`
+        `${req.user.name} will pick you up at the scheduled time`
       );
     }
 
@@ -1151,7 +1122,7 @@ router.get('/my-scheduled', protect, async (req, res) => {
     const rides = await Ride.find({
       driver: req.user._id,
       isScheduled: true,
-      status: { $in: ['searching', 'accepted'] }
+      status: 'searching'
     })
       .populate('student', 'name phone studentId role email')
       .populate('passengers.student', 'name phone studentId role')
