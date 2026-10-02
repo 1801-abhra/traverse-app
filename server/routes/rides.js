@@ -970,7 +970,7 @@ router.put('/cancel-accepted/:id', protect, async (req, res) => {
   try {
     const ride = await Ride.findById(req.params.id);
     if (!ride) return res.status(404).json({ message: 'Ride not found' });
-    if (ride.status !== 'accepted') {
+    if (ride.status !== 'accepted' && !(ride.isScheduled && ride.driver)) {
       return res.status(400).json({ message: 'Can only cancel accepted rides' });
     }
 
@@ -986,7 +986,6 @@ router.put('/cancel-accepted/:id', protect, async (req, res) => {
       console.log(`User ${req.user._id} has reached 5 cancellations - admin review needed`);
     }
 
-
     // Cancel the ride completely
     ride.status = 'cancelled';
     ride.driver = null;
@@ -997,15 +996,15 @@ router.put('/cancel-accepted/:id', protect, async (req, res) => {
       message: 'Ride cancelled successfully.'
     });
 
-    // Notify driver - ride was cancelled by student
+    // Notify driver - ride was cancelled
     if (driverId) {
       req.io.to(driverId.toString()).emit('ride:cancelled-by-party', {
-        message: 'Student cancelled the ride.'
+        message: 'Ride cancelled.'
       });
     }
 
-    // Send push to driver
-    if (driverId) {
+    // Push notification to opposite party
+    if (driverId && req.user._id.toString() === studentId.toString()) {
       const driver = await User.findById(driverId);
       if (driver?.fcmToken) {
         await sendPushNotification(
@@ -1013,6 +1012,16 @@ router.put('/cancel-accepted/:id', protect, async (req, res) => {
           driver.fcmToken,
           '❌ Ride Cancelled',
           'The student has cancelled the ride.'
+        );
+      }
+    } else if (studentId && driverId && req.user._id.toString() === driverId.toString()) {
+      const student = await User.findById(studentId);
+      if (student?.fcmToken) {
+        await sendPushNotification(
+          req.admin,
+          student.fcmToken,
+          '❌ Ride Cancelled',
+          'The driver has cancelled the scheduled ride.'
         );
       }
     }
