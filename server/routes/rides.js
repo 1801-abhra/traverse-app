@@ -151,7 +151,8 @@ router.get('/driver-active', protect, async (req, res) => {
     res.set('Cache-Control', 'no-store');
     const ride = await Ride.findOne({
       driver: req.user._id,
-      status: { $in: ['accepted', 'ontheway'] }
+      status: { $in: ['accepted', 'ontheway'] },
+      isScheduled: { $ne: true }
     })
       .populate('student', 'name email studentId phone')
       .populate('driver', 'name vehicleNumber phone isVerified rating totalRatings')
@@ -1088,12 +1089,16 @@ router.put('/pre-accept/:id', protect, async (req, res) => {
     if (ride.driver) return res.status(400).json({ message: 'Ride already pre-accepted by another driver' });
 
     ride.driver = req.user._id;
+    ride.status = 'accepted';
     await ride.save();
+
     const populated = await Ride.findById(ride._id)
       .populate('driver', 'name vehicleNumber phone carName carModel isVerified rating totalRatings')
       .populate('student', 'name email studentId phone role')
       .populate('passengers.student', 'name phone studentId role');
+
     // Notify student
+    req.io.to(ride.student.toString()).emit('ride:accepted', populated);
     req.io.to(ride.student.toString()).emit('ride:pre-accepted', {
       message: `Driver ${req.user.name} will pick you up at scheduled time!`,
       ride: populated
@@ -1109,7 +1114,7 @@ router.put('/pre-accept/:id', protect, async (req, res) => {
         req.admin,
         student.fcmToken,
         '✅ Scheduled Ride Confirmed!',
-        `${req.user.name} will pick you up at the scheduled time`
+        `Your scheduled ride has been confirmed! ${req.user.name} will pick you up at scheduled time.`
       );
     }
 
@@ -1146,7 +1151,7 @@ router.get('/my-scheduled', protect, async (req, res) => {
     const rides = await Ride.find({
       driver: req.user._id,
       isScheduled: true,
-      status: 'searching'
+      status: { $in: ['searching', 'accepted'] }
     })
       .populate('student', 'name phone studentId role email')
       .populate('passengers.student', 'name phone studentId role')
