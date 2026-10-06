@@ -30,7 +30,7 @@ const sendPushNotification = async (admin, fcmToken, title, body) => {
 router.post('/book', protect, async (req, res) => {
   if (req.user.role === 'driver') {
     return res.status(403).json({
-      message: 'Drivers cannot book rides.'
+      message: 'Access denied. Students only.'
     });
   }
   try {
@@ -110,6 +110,11 @@ router.post('/book', protect, async (req, res) => {
 });
 // Get available rides (driver)
 router.get('/available', protect, async (req, res) => {
+  if (req.user.role !== 'driver') {
+    return res.status(403).json({ 
+      message: 'Access denied. Driver privileges required.' 
+    });
+  }
   try {
     const driver = await User.findById(req.user._id);
     const rides = await Ride.find({
@@ -131,6 +136,11 @@ router.get('/available', protect, async (req, res) => {
 });
 // Toggle driver availability
 router.put('/toggle-availability', protect, async (req, res) => {
+  if (req.user.role !== 'driver') {
+    return res.status(403).json({ 
+      message: 'Access denied. Driver privileges required.' 
+    });
+  }
   try {
     const driver = await User.findById(req.user._id);
     driver.isAvailable = !driver.isAvailable;
@@ -147,6 +157,11 @@ router.put('/toggle-availability', protect, async (req, res) => {
 
 // Get active ride for driver
 router.get('/driver-active', protect, async (req, res) => {
+  if (req.user.role !== 'driver') {
+    return res.status(403).json({ 
+      message: 'Access denied. Driver privileges required.' 
+    });
+  }
   try {
     res.set('Cache-Control', 'no-store');
     const ride = await Ride.findOne({
@@ -222,6 +237,11 @@ router.get('/drivers-available', protect, async (req, res) => {
 
 // Accept ride (driver)
 router.put('/accept/:id', protect, async (req, res) => {
+  if (req.user.role !== 'driver') {
+    return res.status(403).json({ 
+      message: 'Access denied. Only drivers can accept rides.' 
+    });
+  }
   try {
     const ride = await Ride.findById(req.params.id);
     if (!ride) return res.status(404).json({ message: 'Ride not found' });
@@ -298,6 +318,11 @@ router.put('/accept/:id', protect, async (req, res) => {
 });
 // Reject a Ride
 router.put('/reject/:id', protect, async (req, res) => {
+  if (req.user.role !== 'driver') {
+    return res.status(403).json({ 
+      message: 'Access denied. Driver privileges required.' 
+    });
+  }
   try {
     const ride = await Ride.findById(req.params.id);
     if (!ride) return res.status(404).json({ message: 'Ride not found' });
@@ -315,6 +340,11 @@ router.put('/reject/:id', protect, async (req, res) => {
 });
 // Update ride status (driver)
 router.put('/status/:id', protect, async (req, res) => {
+  if (req.user.role !== 'driver') {
+    return res.status(403).json({ 
+      message: 'Access denied. Only drivers can update ride status.' 
+    });
+  }
   try {
     const { status } = req.body;
     const ride = await Ride.findById(req.params.id)
@@ -515,6 +545,11 @@ router.get('/history', protect, async (req, res) => {
 });
 // rate a ride student
 router.put('/rate/:id', protect, async (req, res) => {
+  if (req.user.role === 'driver') {
+    return res.status(403).json({ 
+      message: 'Access denied. Students only.' 
+    });
+  }
   try {
     const { rating } = req.body;
     const ride = await Ride.findById(req.params.id);
@@ -531,6 +566,11 @@ router.put('/rate/:id', protect, async (req, res) => {
 });
 // Get driver average rating
 router.get('/my-rating', protect, async (req, res) => {
+  if (req.user.role !== 'driver') {
+    return res.status(403).json({ 
+      message: 'Access denied. Driver privileges required.' 
+    });
+  }
   try {
     const rides = await Ride.find({
       driver: req.user._id,
@@ -623,7 +663,7 @@ router.put('/admin/cancel/:id', async (req, res) => {
 router.post('/book-shared', protect, async (req, res) => {
   if (req.user.role === 'driver') {
     return res.status(403).json({
-      message: 'Drivers cannot book rides.'
+      message: 'Access denied. Students only.'
     });
   }
   try {
@@ -736,6 +776,11 @@ router.post('/book-shared', protect, async (req, res) => {
 });
 // Join existing shared ride
 router.put('/join-shared/:id', protect, async (req, res) => {
+  if (req.user.role === 'driver') {
+    return res.status(403).json({ 
+      message: 'Access denied. Students only.' 
+    });
+  }
   try {
     const ride = await Ride.findById(req.params.id)
       .populate('student', 'name phone')
@@ -833,6 +878,11 @@ router.put('/join-shared/:id', protect, async (req, res) => {
 });
 
 router.put('/leave-shared/:id', protect, async (req, res) => {
+  if (req.user.role === 'driver') {
+    return res.status(403).json({ 
+      message: 'Access denied. Students only.' 
+    });
+  }
   try {
     const ride = await Ride.findById(req.params.id)
       .populate('passengers.student', 'name phone');
@@ -1014,6 +1064,11 @@ router.put('/cancel-accepted/:id', protect, async (req, res) => {
 // Pre-accept scheduled ride (driver)
 // Driver starts a pre-accepted scheduled ride now
 router.put('/start-scheduled/:id', protect, async (req, res) => {
+  if (req.user.role !== 'driver') {
+    return res.status(403).json({ 
+      message: 'Access denied. Driver privileges required.' 
+    });
+  }
   try {
     const ride = await Ride.findById(req.params.id)
       .populate('student', 'name studentId phone role')
@@ -1057,6 +1112,11 @@ router.put('/start-scheduled/:id', protect, async (req, res) => {
 });
 
 router.put('/pre-accept/:id', protect, async (req, res) => {
+  if (req.user.role !== 'driver') {
+    return res.status(403).json({ 
+      message: 'Access denied. Driver privileges required.' 
+    });
+  }
   try {
     const ride = await Ride.findById(req.params.id);
     if (!ride) return res.status(404).json({ message: 'Ride not found' });
@@ -1097,6 +1157,11 @@ router.put('/pre-accept/:id', protect, async (req, res) => {
 
 // Get scheduled rides for driver
 router.get('/scheduled', protect, async (req, res) => {
+  if (req.user.role !== 'driver') {
+    return res.status(403).json({ 
+      message: 'Access denied. Driver privileges required.' 
+    });
+  }
   try {
     const driver = await User.findById(req.user._id);
     const now = new Date();
@@ -1118,6 +1183,11 @@ router.get('/scheduled', protect, async (req, res) => {
 
 // Get driver's pre-accepted scheduled rides
 router.get('/my-scheduled', protect, async (req, res) => {
+  if (req.user.role !== 'driver') {
+    return res.status(403).json({ 
+      message: 'Access denied. Driver privileges required.' 
+    });
+  }
   try {
     const rides = await Ride.find({
       driver: req.user._id,
