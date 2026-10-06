@@ -105,7 +105,7 @@ router.post('/book', protect, async (req, res) => {
 
     res.status(201).json(ride);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 // Get available rides (driver)
@@ -126,7 +126,7 @@ router.get('/available', protect, async (req, res) => {
     res.json(rides);
   } catch (error) {
     console.log('Available rides error:', error.message);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 // Toggle driver availability
@@ -141,7 +141,7 @@ router.put('/toggle-availability', protect, async (req, res) => {
     });
     res.json({ isAvailable: driver.isAvailable });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -158,7 +158,7 @@ router.get('/driver-active', protect, async (req, res) => {
       .populate('passengers.student', 'name phone');
     res.json(ride || null);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -216,7 +216,7 @@ router.get('/drivers-available', protect, async (req, res) => {
       currentLoad
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -293,7 +293,7 @@ router.put('/accept/:id', protect, async (req, res) => {
     }
   } catch (error) {
     console.log('Accept error:', error.message);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 // Reject a Ride
@@ -310,7 +310,7 @@ router.put('/reject/:id', protect, async (req, res) => {
     await ride.save();
     res.json({ message: 'Ride rejected' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 // Update ride status (driver)
@@ -356,7 +356,7 @@ router.put('/status/:id', protect, async (req, res) => {
 
     res.json(populated);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -492,7 +492,7 @@ router.put('/cancel/:id', protect, async (req, res) => {
       return res.json({ message: 'Left ride successfully', ride: updatedRide });
     }
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 // Ride history
@@ -510,7 +510,7 @@ router.get('/history', protect, async (req, res) => {
     res.json(rides);
   } catch (error) {
     console.error('History fetch error:', error.message);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 // rate a ride student
@@ -526,7 +526,7 @@ router.put('/rate/:id', protect, async (req, res) => {
     await ride.save();
     res.json(ride);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 // Get driver average rating
@@ -544,7 +544,7 @@ router.get('/my-rating', protect, async (req, res) => {
     const average = (sum / total).toFixed(1);
     res.json({ average, total });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 // Admin - get paginated rides with robust search and status filter
@@ -604,7 +604,7 @@ router.get('/admin/rides', async (req, res) => {
     });
   } catch (error) {
     console.error('Admin rides error:', error.message);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -616,7 +616,7 @@ router.put('/admin/cancel/:id', async (req, res) => {
     await ride.save();
     res.json(ride);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 // Book shared ride
@@ -731,7 +731,7 @@ router.post('/book-shared', protect, async (req, res) => {
 
   } catch (error) {
     console.log('book-shared error:', error.message);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 // Join existing shared ride
@@ -828,7 +828,7 @@ router.put('/join-shared/:id', protect, async (req, res) => {
       message: `Joined ride! Fare: ₹${splitFare} each (${totalPassengers} passengers)`
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -903,7 +903,7 @@ router.put('/leave-shared/:id', protect, async (req, res) => {
       ride: updatedRide
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -929,7 +929,7 @@ router.get('/shared/available', protect, async (req, res) => {
       .populate('passengers.student', 'name phone');
     res.json(rides);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 // Get active ride for student
@@ -947,7 +947,7 @@ router.get('/active', protect, async (req, res) => {
       .populate('passengers.student', 'name phone');
     res.json(ride || null);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 // Cancel accepted ride (both student and driver)
@@ -1008,7 +1008,7 @@ router.put('/cancel-accepted/:id', protect, async (req, res) => {
       warning: user.cancelCount >= 3 ? `Warning: ${5 - user.cancelCount} cancellations left before blacklist` : null
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 // Pre-accept scheduled ride (driver)
@@ -1052,7 +1052,7 @@ router.put('/start-scheduled/:id', protect, async (req, res) => {
     res.json(populated);
   } catch (error) {
     console.error('Start scheduled error:', error.message);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -1091,7 +1091,7 @@ router.put('/pre-accept/:id', protect, async (req, res) => {
 
     res.json(populated);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -1112,7 +1112,7 @@ router.get('/scheduled', protect, async (req, res) => {
       .sort({ scheduledTime: 1 });
     res.json(rides);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -1129,7 +1129,7 @@ router.get('/my-scheduled', protect, async (req, res) => {
       .sort({ scheduledTime: 1 });
     res.json(rides);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 module.exports = router;

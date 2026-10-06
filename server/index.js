@@ -322,13 +322,38 @@ if (typeof Sentry.setupExpressErrorHandler === 'function') {
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error('Global error:', err.message);
+  console.error('Server error:', err);
   if (process.env.SENTRY_DSN) {
     Sentry.captureException(err);
   }
-  res.status(err.status || 500).json({
-    message: err.message || 'Internal server error'
-  });
+  
+  // Never expose internal error details to client
+  let statusCode = err.status || 500;
+  let message = 'Something went wrong. Please try again.';
+  
+  // Only show safe known messages
+  if (err.name === 'ValidationError') {
+    statusCode = 400;
+    message = 'Invalid data provided. Please check your input.';
+  }
+  if (err.name === 'CastError') {
+    statusCode = 400;
+    message = 'Invalid request format.';
+  }
+  if (err.code === 11000) {
+    statusCode = 400;
+    message = 'This email is already registered.';
+  }
+  if (err.name === 'JsonWebTokenError') {
+    statusCode = 401;
+    message = 'Session expired. Please login again.';
+  }
+  if (err.name === 'TokenExpiredError') {
+    statusCode = 401;
+    message = 'Session expired. Please login again.';
+  }
+  
+  res.status(statusCode).json({ message });
 });
 
 const PORT = process.env.PORT || 5000;

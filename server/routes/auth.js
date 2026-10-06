@@ -57,7 +57,7 @@ router.post('/register', async (req, res) => {
     }
   } catch (error) {
     console.log('Register error:', error.message);
-    return res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 // Login
@@ -134,7 +134,7 @@ router.post('/login', async (req, res) => {
     });
   } catch (error) {
     console.log('Login error:', error.message);
-    return res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 // Admin - get platform overview statistics
@@ -194,7 +194,7 @@ router.get('/admin/stats', adminOnly, async (req, res) => {
     });
   } catch (error) {
     console.error('Admin stats error:', error.message);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -263,7 +263,7 @@ router.get('/admin/users', adminOnly, async (req, res) => {
     });
   } catch (error) {
     console.error('Admin users error:', error.message);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -297,7 +297,7 @@ router.put('/admin/block/:id', adminOnly, async (req, res) => {
 
     res.json({ message: `User ${user.isBlocked ? 'blocked' : 'unblocked'}`, user: sanitizedUser });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -325,7 +325,7 @@ router.put('/admin/verify/:id', adminOnly, async (req, res) => {
     res.json({ message: 'Driver verified successfully', driver });
   } catch (error) {
     console.log('Verify error:', error.message);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -366,7 +366,7 @@ router.put('/admin/toggle-availability/:id', adminOnly, async (req, res) => {
     });
   } catch (error) {
     console.log('Admin toggle availability error:', error.message);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -376,7 +376,7 @@ router.get('/me', protect, async (req, res) => {
     const user = await User.findById(req.user._id).select('-password -fcmToken -sessionToken -resetPasswordToken -verificationToken -loginAttempts -lockUntil');
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -418,7 +418,7 @@ router.get('/verify-email/:token', async (req, res) => {
       </html>
     `);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -438,7 +438,7 @@ router.post('/resend-verification', async (req, res) => {
     await sendVerificationEmail(email, user.name, verificationToken);
     res.json({ message: 'Verification email sent!' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -460,7 +460,7 @@ router.post('/forgot-password', async (req, res) => {
 
     res.json({ message: 'Password reset email sent! Check your inbox.' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -482,7 +482,7 @@ router.post('/reset-password/:token', async (req, res) => {
 
     res.json({ message: 'Password reset successful! You can now login.' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -502,7 +502,7 @@ router.post('/admin/login', async (req, res) => {
     }
     return res.status(401).json({ message: 'Invalid admin credentials' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -511,7 +511,7 @@ router.post('/logout', protect, async (req, res) => {
     await User.findByIdAndUpdate(req.user._id, { sessionToken: null });
     res.json({ message: 'Logged out successfully' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -524,6 +524,6 @@ router.post('/save-token', protect, async (req, res) => {
     await User.findByIdAndUpdate(req.user._id, { fcmToken });
     res.json({ message: 'Token saved' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
