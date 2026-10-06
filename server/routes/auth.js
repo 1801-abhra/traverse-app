@@ -249,7 +249,7 @@ router.get('/admin/users', adminOnly, async (req, res) => {
 
     const total = await User.countDocuments(filter);
     const users = await User.find(filter)
-      .select('-password')
+      .select('-password -fcmToken -sessionToken -resetPasswordToken -verificationToken -loginAttempts -lockUntil')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
@@ -285,7 +285,17 @@ router.put('/admin/block/:id', adminOnly, async (req, res) => {
     if (!user) return res.status(404).json({ message: 'User not found' });
     user.isBlocked = !user.isBlocked;
     await user.save();
-    res.json({ message: `User ${user.isBlocked ? 'blocked' : 'unblocked'}`, user });
+
+    const sanitizedUser = user.toObject();
+    delete sanitizedUser.password;
+    delete sanitizedUser.fcmToken;
+    delete sanitizedUser.sessionToken;
+    delete sanitizedUser.resetPasswordToken;
+    delete sanitizedUser.verificationToken;
+    delete sanitizedUser.loginAttempts;
+    delete sanitizedUser.lockUntil;
+
+    res.json({ message: `User ${user.isBlocked ? 'blocked' : 'unblocked'}`, user: sanitizedUser });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -305,7 +315,12 @@ router.put('/admin/verify/:id', adminOnly, async (req, res) => {
       }
     }
 
-    const driver = await User.findByIdAndUpdate(req.params.id, { isVerified: true }, { new: true });
+    const driver = await User.findByIdAndUpdate(
+      req.params.id,
+      { isVerified: true },
+      { new: true }
+    ).select('-password -fcmToken -sessionToken -resetPasswordToken -verificationToken -loginAttempts -lockUntil');
+
     if (!driver) return res.status(404).json({ message: 'Driver not found' });
     res.json({ message: 'Driver verified successfully', driver });
   } catch (error) {
@@ -335,10 +350,19 @@ router.put('/admin/toggle-availability/:id', adminOnly, async (req, res) => {
     driver.isAvailable = !driver.isAvailable;
     await driver.save();
 
+    const sanitizedDriver = driver.toObject();
+    delete sanitizedDriver.password;
+    delete sanitizedDriver.fcmToken;
+    delete sanitizedDriver.sessionToken;
+    delete sanitizedDriver.resetPasswordToken;
+    delete sanitizedDriver.verificationToken;
+    delete sanitizedDriver.loginAttempts;
+    delete sanitizedDriver.lockUntil;
+
     res.json({
       message: `Driver status changed to ${driver.isAvailable ? 'Online' : 'Offline'}`,
       isAvailable: driver.isAvailable,
-      driver
+      driver: sanitizedDriver
     });
   } catch (error) {
     console.log('Admin toggle availability error:', error.message);
@@ -349,7 +373,7 @@ router.put('/admin/toggle-availability/:id', adminOnly, async (req, res) => {
 // Get current user
 router.get('/me', protect, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('-password');
+    const user = await User.findById(req.user._id).select('-password -fcmToken -sessionToken -resetPasswordToken -verificationToken -loginAttempts -lockUntil');
     res.json(user);
   } catch (error) {
     res.status(500).json({ message: error.message });

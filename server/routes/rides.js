@@ -81,7 +81,7 @@ router.post('/book', protect, async (req, res) => {
     });
 
     const populatedRide = await Ride.findById(ride._id)
-      .populate('student', 'name email studentId role');
+      .populate('student', 'name studentId phone role');
     req.io.emit('new:ride', populatedRide);
 
     // Notify drivers
@@ -119,7 +119,7 @@ router.get('/available', protect, async (req, res) => {
       isScheduled: { $ne: true },
       rejectedBy: { $nin: [req.user._id] }
     })
-      .populate('student', 'name email studentId phone role')
+      .populate('student', 'name studentId phone role')
       .populate('passengers.student', 'name phone')
       .sort({ createdAt: 1 })
       .limit(5);
@@ -153,8 +153,8 @@ router.get('/driver-active', protect, async (req, res) => {
       driver: req.user._id,
       status: { $in: ['accepted', 'ontheway'] }
     })
-      .populate('student', 'name email studentId phone')
-      .populate('driver', 'name vehicleNumber phone isVerified')
+      .populate('student', 'name studentId phone role')
+      .populate('driver', 'name vehicleNumber phone carName carModel isVerified rating vehicleType')
       .populate('passengers.student', 'name phone');
     res.json(ride || null);
   } catch (error) {
@@ -240,8 +240,8 @@ router.put('/accept/:id', protect, async (req, res) => {
     await ride.save();
 
     const populated = await Ride.findById(ride._id)
-      .populate('driver', 'name vehicleNumber phone carName carModel isVerified')
-      .populate('student', 'name email studentId phone')
+      .populate('driver', 'name vehicleNumber phone carName carModel isVerified rating vehicleType')
+      .populate('student', 'name studentId phone role')
       .populate('passengers.student', 'name phone');
 
     // Notify original student
@@ -318,7 +318,7 @@ router.put('/status/:id', protect, async (req, res) => {
   try {
     const { status } = req.body;
     const ride = await Ride.findById(req.params.id)
-      .populate('student', 'name phone')
+      .populate('student', 'name studentId phone role')
       .populate('passengers.student', 'name phone');
 
     if (!ride) return res.status(404).json({ message: 'Ride not found' });
@@ -327,8 +327,8 @@ router.put('/status/:id', protect, async (req, res) => {
     await ride.save();
 
     const populated = await Ride.findById(ride._id)
-      .populate('driver', 'name vehicleNumber phone carName carModel isVerified')
-      .populate('student', 'name email studentId phone')
+      .populate('driver', 'name vehicleNumber phone carName carModel isVerified rating vehicleType')
+      .populate('student', 'name studentId phone role')
       .populate('passengers.student', 'name phone');
 
     // Notify original student
@@ -503,8 +503,8 @@ router.get('/history', protect, async (req, res) => {
       ? { driver: req.user._id }
       : { $or: [{ student: req.user._id }, { 'passengers.student': req.user._id }] };
     const rides = await Ride.find(query)
-      .populate('student', 'name phone')
-      .populate('driver', 'name vehicleNumber phone carName carModel vehicleType isVerified')
+      .populate('student', 'name studentId phone role')
+      .populate('driver', 'name vehicleNumber phone carName carModel isVerified rating vehicleType')
       .populate('passengers.student', 'name phone')
       .sort({ createdAt: -1 });
     res.json(rides);
@@ -589,8 +589,8 @@ router.get('/admin/rides', async (req, res) => {
 
     const total = await Ride.countDocuments(filter);
     const rides = await Ride.find(filter)
-      .populate('student', 'name email studentId phone role')
-      .populate('driver', 'name email vehicleNumber phone carName carModel vehicleType isVerified')
+      .populate('student', 'name studentId phone role')
+      .populate('driver', 'name vehicleNumber phone carName carModel isVerified rating vehicleType')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
@@ -690,7 +690,7 @@ router.post('/book-shared', protect, async (req, res) => {
     });
 
     const populatedRide = await Ride.findById(ride._id)
-      .populate('student', 'name email studentId phone role')
+      .populate('student', 'name studentId phone role')
       .populate('passengers.student', 'name phone');
 
     req.io.emit('new:ride', populatedRide || ride);
@@ -731,7 +731,7 @@ router.post('/book-shared', protect, async (req, res) => {
 
   } catch (error) {
     console.log('book-shared error:', error.message);
-    ~res.status(500).json({ message: error.message });
+    res.status(500).json({ message: error.message });
   }
 });
 // Join existing shared ride
@@ -925,7 +925,7 @@ router.get('/shared/available', protect, async (req, res) => {
     if (dropoff) filter.dropoff = dropoff;
 
     const rides = await Ride.find(filter)
-      .populate('student', 'name studentId phone')
+      .populate('student', 'name studentId phone role')
       .populate('passengers.student', 'name phone');
     res.json(rides);
   } catch (error) {
@@ -942,8 +942,8 @@ router.get('/active', protect, async (req, res) => {
       ],
       status: { $in: ['searching', 'accepted', 'ontheway'] }
     })
-      .populate('driver', 'name vehicleNumber phone carName carModel isVerified')
-      .populate('student', 'name email studentId phone')
+      .populate('driver', 'name vehicleNumber phone carName carModel isVerified rating vehicleType')
+      .populate('student', 'name studentId phone role')
       .populate('passengers.student', 'name phone');
     res.json(ride || null);
   } catch (error) {
@@ -1016,8 +1016,8 @@ router.put('/cancel-accepted/:id', protect, async (req, res) => {
 router.put('/start-scheduled/:id', protect, async (req, res) => {
   try {
     const ride = await Ride.findById(req.params.id)
-      .populate('student', 'name phone email studentId role')
-      .populate('driver', 'name vehicleNumber phone carName carModel isVerified');
+      .populate('student', 'name studentId phone role')
+      .populate('driver', 'name vehicleNumber phone carName carModel isVerified rating vehicleType');
 
     if (!ride) return res.status(404).json({ message: 'Ride not found' });
     const driverId = ride.driver?._id || ride.driver;
@@ -1031,8 +1031,8 @@ router.put('/start-scheduled/:id', protect, async (req, res) => {
     await ride.save();
 
     const populated = await Ride.findById(ride._id)
-      .populate('driver', 'name vehicleNumber phone carName carModel isVerified')
-      .populate('student', 'name email studentId phone role')
+      .populate('driver', 'name vehicleNumber phone carName carModel isVerified rating vehicleType')
+      .populate('student', 'name studentId phone role')
       .populate('passengers.student', 'name phone');
 
     // Notify student - ride is now active
@@ -1066,8 +1066,8 @@ router.put('/pre-accept/:id', protect, async (req, res) => {
     ride.driver = req.user._id;
     await ride.save();
     const populated = await Ride.findById(ride._id)
-      .populate('driver', 'name vehicleNumber phone carName carModel isVerified')
-      .populate('student', 'name email studentId phone role')
+      .populate('driver', 'name vehicleNumber phone carName carModel isVerified rating vehicleType')
+      .populate('student', 'name studentId phone role')
       .populate('passengers.student', 'name phone studentId role');
     // Notify student
     req.io.to(ride.student.toString()).emit('ride:pre-accepted', {
@@ -1107,7 +1107,7 @@ router.get('/scheduled', protect, async (req, res) => {
       scheduledTime: { $gt: now },
       driver: null
     })
-      .populate('student', 'name phone studentId role email')
+      .populate('student', 'name studentId phone role')
       .populate('passengers.student', 'name phone studentId role')
       .sort({ scheduledTime: 1 });
     res.json(rides);
@@ -1124,7 +1124,7 @@ router.get('/my-scheduled', protect, async (req, res) => {
       isScheduled: true,
       status: 'searching'
     })
-      .populate('student', 'name phone studentId role email')
+      .populate('student', 'name studentId phone role')
       .populate('passengers.student', 'name phone studentId role')
       .sort({ scheduledTime: 1 });
     res.json(rides);
