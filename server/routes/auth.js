@@ -36,26 +36,32 @@ const sanitizePhone = (phone) => {
 // Register
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, role, vehicleType } = req.body;
+    const { name, email, password, role, studentId, phone, vehicleNumber, carName, carModel, vehicleType } = req.body;
 
-    const cleanName = sanitizeName(req.body.name);
-
-    // Check if original had HTML/script tags
-    const hasHtmlTags = /<[^>]*>/g.test(req.body.name || '');
-    const hasJsProtocol = /javascript:/gi.test(req.body.name || '');
-    const hasEventHandlers = /on\w+\s*=/gi.test(req.body.name || '');
-
-    if (hasHtmlTags || hasJsProtocol || hasEventHandlers) {
+    // Validate name - reject any HTML or script content
+    const dangerousPattern = /[<>'"&\\\/]|javascript:|on\w+\s*=/gi;
+    if (name && dangerousPattern.test(name)) {
       return res.status(400).json({ 
         message: 'Invalid characters in name. Please use only letters and spaces.' 
       });
     }
 
-    const cleanStudentId = sanitizeName(req.body.studentId);
-    const cleanVehicleNumber = sanitizeName(req.body.vehicleNumber);
-    const cleanCarName = sanitizeName(req.body.carName);
-    const cleanCarModel = sanitizeName(req.body.carModel);
-    const cleanPhone = sanitizePhone(req.body.phone);
+    // Also validate other text fields
+    const textFields = [studentId, vehicleNumber, carName, carModel];
+    for (const field of textFields) {
+      if (field && dangerousPattern.test(field)) {
+        return res.status(400).json({ 
+          message: 'Invalid characters detected. Please check your input.' 
+        });
+      }
+    }
+
+    const cleanName = sanitizeName(name);
+    const cleanStudentId = sanitizeName(studentId);
+    const cleanVehicleNumber = sanitizeName(vehicleNumber);
+    const cleanCarName = sanitizeName(carName);
+    const cleanCarModel = sanitizeName(carModel);
+    const cleanPhone = sanitizePhone(phone);
 
     // Email validation
     if (role === 'student' && !email.endsWith('@juitsolan.in')) {
