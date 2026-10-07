@@ -10,10 +10,46 @@ const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 };
 
+const sanitizeName = (name) => {
+  if (!name) return '';
+  return name
+    .replace(/</g, '')
+    .replace(/>/g, '')
+    .replace(/&/g, '')
+    .replace(/"/g, '')
+    .replace(/'/g, '')
+    .replace(/\//g, '')
+    .replace(/\\/g, '')
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+=/gi, '')
+    .replace(/href=/gi, '')
+    .replace(/src=/gi, '')
+    .trim()
+    .substring(0, 50); // Max 50 characters for name
+};
+
+const sanitizePhone = (phone) => {
+  if (!phone) return '';
+  return phone.replace(/[^0-9+\-\s]/g, '').substring(0, 15);
+};
+
 // Register
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, role, studentId, vehicleNumber, phone, carName, carModel, vehicleType } = req.body;
+    const { email, password, role, vehicleType } = req.body;
+
+    const cleanName = sanitizeName(req.body.name);
+    const cleanStudentId = sanitizeName(req.body.studentId);
+    const cleanVehicleNumber = sanitizeName(req.body.vehicleNumber);
+    const cleanCarName = sanitizeName(req.body.carName);
+    const cleanCarModel = sanitizeName(req.body.carModel);
+    const cleanPhone = sanitizePhone(req.body.phone);
+
+    if (req.body.name && req.body.name !== cleanName && req.body.name.includes('<')) {
+      return res.status(400).json({ 
+        message: 'Invalid characters in name. Please use only letters and spaces.' 
+      });
+    }
 
     // Email validation
     if (role === 'student' && !email.endsWith('@juitsolan.in')) {
@@ -36,8 +72,16 @@ router.post('/register', async (req, res) => {
     const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     const user = new User({
-      name, email, password, role, studentId, vehicleNumber,
-      phone, carName, carModel, vehicleType,
+      name: cleanName,
+      email,
+      password,
+      role,
+      studentId: cleanStudentId,
+      vehicleNumber: cleanVehicleNumber,
+      phone: cleanPhone,
+      carName: cleanCarName,
+      carModel: cleanCarModel,
+      vehicleType,
       verificationToken,
       verificationExpiry,
       isVerified: false
@@ -46,7 +90,7 @@ router.post('/register', async (req, res) => {
 
     // Send verification email only for students and faculty
     if (role !== 'driver') {
-      await sendVerificationEmail(email, name, verificationToken);
+      await sendVerificationEmail(email, cleanName, verificationToken);
       return res.status(201).json({
         message: 'Registration successful! Please check your email to verify your account.'
       });
