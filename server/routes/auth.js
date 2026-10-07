@@ -565,7 +565,6 @@ router.post('/logout', protect, async (req, res) => {
   }
 });
 
-module.exports = router;
 // Save FCM token
 router.post('/save-token', protect, async (req, res) => {
   try {
@@ -577,3 +576,5 @@ router.post('/save-token', protect, async (req, res) => {
     res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 });
+
+module.exports = router;
